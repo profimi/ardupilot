@@ -270,6 +270,7 @@ class TestBuildOptions(object):
             'AP_PLANE_BLACKBOX_LOGGING',  # entirely elided if no user
             'AP_COMPASS_AK8963_ENABLED',  # probed on a board-by-board basis, not on CubeOrange for example
             'AP_COMPASS_LSM303D_ENABLED',  # probed on a board-by-board basis, not on CubeOrange for example
+            'PLD_ENABLED', # Displays payload arming, contols it's timeout and relay number
         ])
         if target.lower() != "copter":
             feature_define_whitelist.add('MODE_ZIGZAG_ENABLED')

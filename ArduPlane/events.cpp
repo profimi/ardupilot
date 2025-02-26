@@ -32,6 +32,7 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, ModeReason reaso
     case Mode::Number::FLY_BY_WIRE_A:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
+    case Mode::Number::FLY_BY_WIRE_C:
     case Mode::Number::CRUISE:
     case Mode::Number::TRAINING:  
         if(plane.emergency_landing) {
@@ -42,6 +43,8 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, ModeReason reaso
             set_mode(mode_fbwa, reason);
         } else if (g.fs_action_short == FS_ACTION_SHORT_FBWB) {
             set_mode(mode_fbwb, reason);
+        } else if (g.fs_action_short == FS_ACTION_SHORT_FBWC) {
+            set_mode(mode_fbwc, reason);
         } else {
             set_mode(mode_circle, reason); // circle if action = 0 or 1 
         }
@@ -124,6 +127,7 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
     case Mode::Number::FLY_BY_WIRE_A:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
+    case Mode::Number::FLY_BY_WIRE_C:
     case Mode::Number::CRUISE:
     case Mode::Number::TRAINING:
     case Mode::Number::CIRCLE:

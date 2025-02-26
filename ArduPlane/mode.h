@@ -70,6 +70,9 @@ public:
 #endif
 
     // Mode number 30 reserved for "offboard" for external/lua control.
+    
+    // Custom
+        FLY_BY_WIRE_C = 31,
     };
 
     // Constructor
@@ -616,6 +619,32 @@ public:
 
 protected:
 
+    bool _enter() override;
+};
+
+class ModeFBWC : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::FLY_BY_WIRE_C; }
+    const char *name() const override { return "FLY_BY_WIRE_C"; }
+    const char *name4() const override { return "FBWC"; }
+
+    bool allows_terrain_disable() const override { return true; }
+
+    bool does_automatic_thermal_switch() const override { return true; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+
+    bool does_auto_throttle() const override { return true; }
+    
+    bool mode_allows_autotuning() const override { return false; }
+
+    void update_target_altitude() override {};
+
+protected:
+    float target_yaw = 0.0f;
     bool _enter() override;
 };
 

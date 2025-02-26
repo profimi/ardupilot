@@ -1319,6 +1319,21 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("FWD_BAT_THR_CUT", 37, ParametersG2, fwd_batt_cmp.batt_voltage_throttle_cutoff, 0.0f),
 
+    // @Param: TAKEOFF_UNSAFE
+    // @DisplayName: Takeoff without GPS enable
+    // @Description: Allows to use takeoff mode without GPS
+    // @Values: 0:Disable, 1:Enable
+    // @User: Standard
+    AP_GROUPINFO("TAKEOFF_UNSAFE", 38, ParametersG2, takeoff_unsafe, TAKEOFF_UNSAFE),
+
+    // @Param: AUTOTHROTTLE_ALT_MIN
+    // @DisplayName: Minimum altitude to allow throttle in automatic throttle modes
+    // @Description: Allow throttle in automatic throttle modes on lower altitudes than default 10m ATO. Useful in mountain conditions
+    // @Range -1000 1000
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("AUTOTHROTTLE_ALT_MIN", 39, ParametersG2, autothrottle_alt_min, AUTOTHROTTLE_ALT_MIN),
+
     AP_GROUPEND
 };
 

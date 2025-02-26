@@ -220,3 +220,13 @@
 #ifndef THR_CTRL_LAND_THRESH
  #define THR_CTRL_LAND_THRESH 0.7
 #endif
+
+/////////////////////////////////////////////////////////////////////////////
+// Custom items
+#ifndef TAKEOFF_UNSAFE
+    #define TAKEOFF_UNSAFE 0
+#endif
+
+#ifndef AUTOTHROTTLE_ALT_MIN
+    #define AUTOTHROTTLE_ALT_MIN 10.0f
+#endif

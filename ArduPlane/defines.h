@@ -39,6 +39,7 @@ enum failsafe_action_short {
     FS_ACTION_SHORT_FBWA = 2,
     FS_ACTION_SHORT_DISABLED = 3,
     FS_ACTION_SHORT_FBWB = 4,
+    FS_ACTION_SHORT_FBWC = 5,
 };
 
 enum failsafe_action_long {

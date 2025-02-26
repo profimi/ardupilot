@@ -20,8 +20,9 @@
 
 #include <AP_Param/AP_Param.h>
 
-#define VTX_MAX_CHANNELS 8
-#define VTX_MAX_POWER_LEVELS 10
+constexpr uint8_t VTX_MAX_CHANNELS = 8;
+constexpr uint8_t VTX_MAX_POWER_LEVELS = 14;
+constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;
 
 class AP_VideoTX {
 public:
@@ -57,16 +58,28 @@ public:
 
     enum VideoBand {
         BAND_A,
+        BAND_o = BAND_A,
         BAND_B,
+        BAND_x = BAND_B
         BAND_E,
-        FATSHARK,
+        FATSHARK,  // Airwave
+        BAND_F = FATSHARK,
         RACEBAND,
+        BAND_R = RACEBAND,
         LOW_RACEBAND,
+        BAND_L = LOW_RACEBAND,
         BAND_1G3_A,
         BAND_1G3_B,
         BAND_X,
+        BAND_b = BAND_X,
         BAND_3G3_A,
         BAND_3G3_B,
+        // Custom bands
+        BAND_P,
+        BAND_H = BAND_P,
+        BAND_U,
+        BAND_O,
+        BAND_S,
         MAX_BANDS
     };
 
@@ -158,6 +171,8 @@ public:
     bool get_enabled() const { return _enabled; }
     bool update_enabled() const { return _defaults_set && _enabled != _current_enabled; }
 
+    void set_preset(uint8_t preset_no);
+
     // have the parameters been updated
     bool have_params_changed() const;
     // set configured defaults from current settings, return true if defaults were set
@@ -203,6 +218,22 @@ private:
 
     AP_Int8 _enabled;
     bool _current_enabled;
+
+    // Preset block
+    AP_Int8 _preset_1;
+    AP_Int8 _current_preset_1;
+    AP_Int8 _preset_2;
+    AP_Int8 _current_preset_2;
+    AP_Int8 _preset_3;
+    AP_Int8 _current_preset_3;
+    AP_Int8 _preset_4;
+    AP_Int8 _current_preset_4;
+    AP_Int8 _preset_5;
+    AP_Int8 _current_preset_5;
+    AP_Int8 _preset_6;
+    AP_Int8 _current_preset_6;
+
+    AP_Int8 _num_active_levels;
 
     bool _initialized;
     // when defaults have been configured

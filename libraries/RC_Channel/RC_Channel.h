@@ -264,6 +264,10 @@ public:
         AHRS_AUTO_TRIM =     182,  // in-flight trim Copter AHRS using manual levelling
         AUTOLAND =           183,  //Fixed Wing AUTOLAND Mode
 
+        VTX_PRESET =         197, // VTX preset change function
+        VTX_BAND =           198, // VTX band change function
+        VTX_CHANNEL =        199, // VTX channel change function
+
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
         PITCH =              202, // pitch input

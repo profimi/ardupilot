@@ -72,8 +72,52 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: MAX_POWER
     // @DisplayName: Video Transmitter Max Power Level
     // @Description: Video Transmitter Maximum Power Level. Different VTXs support different power levels, this prevents the power aux switch from requesting too high a power level. The switch supports 6 power levels and the selected power will be a subdivision between 0 and this setting.
-    // @Range: 25 1000
-    AP_GROUPINFO("MAX_POWER", 7, AP_VideoTX, _max_power_mw, 800),
+    // @Range: 25 3000
+    AP_GROUPINFO("MAX_POWER", 7, AP_VideoTX, _max_power_mw, 1000),
+
+    // Presets //////////////////////////////////////////////////
+
+    // @Param: PRESET1
+    // @DisplayName: Preset #1
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset_1, 00),
+
+    // @Param: PRESET2
+    // @DisplayName: Preset #2
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset_2, 01),
+
+    // @Param: PRESET3
+    // @DisplayName: Preset #3
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset_3, 02),
+
+    // @Param: PRESET4
+    // @DisplayName: Preset #4
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset_4, 03),
+
+    // @Param: PRESET5
+    // @DisplayName: Preset #5
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset_5, 04),
+
+    // @Param: PRESET6
+    // @DisplayName: Preset #6
+    // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
+    // @Range: 0 99
+    AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset_6, 05),
+
+    // @Param: POW_LEVELS
+    // @DisplayName: Power level count
+    // @Description: How many proper power levels has been configured
+    // @Range: 0 45
+    AP_GROUPINFO("POW_LEVELS", 32, AP_VideoTX, _num_active_levels, 6),
 
     AP_GROUPEND
 };
@@ -87,26 +131,31 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
 
 extern const AP_HAL::HAL& hal;
 
-const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L","1G3_A","1G3_B","X","3G3_A","3G3_B"};
+const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L","1G3_A","1G3_B","X","3G3_A","3G3_B","P","U","O","S"};
 
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
 {
-    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* Band A */
-    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* Band B */
+    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* Band A, o */
+    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* Band B, x */
     { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* Band E */
-    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* Airwave */
-    { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* Race */
-    { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* LO Race */
+    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* Airwave,FATSHARK, F */
+    { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* Race, R */
+    { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* LO Race, L */
     { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* Band 1G3_A */
     { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* Band 1G3_B */
-    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* Band X */
+    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* Band X, b */
     { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* Band 3G3_A */
-    { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}  /* Band 3G3_B */
+    { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* Band 3G3_B */
+    { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* Band P, H */
+    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* Band U */
+    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* Band O */
+    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* Band S */
 };
 
 // mapping of power level to milliwatt to dbm
 // valid power levels from SmartAudio spec, the adjacent levels might be the actual values
 // so these are marked as level + 0x10 and will be switched if a dbm message proves it
+// Ascedenting ordering of this table by the power in mw is essential
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     // level, mw, dbm, dac
     { 0xFF,  0,    0, 0    }, // only in SA 2.1
@@ -118,6 +167,10 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
     { 3,    800,  29, 40   },
     { 0x13, 1000, 30, 0xFF }, // only in SA 2.1
+    { 0x21, 1800, 32, 0xFF }, // only in SA 2.1
+    { 0x22, 2000, 33, 0xFF }, // only in SA 2.1
+    { 0x23, 2500, 34, 0xFF }, // only in SA 2.1
+    { 0x24, 3000, 35, 0xFF }, // only in SA 2.1
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
 
@@ -273,7 +326,7 @@ void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
 // set the power in mw
 void AP_VideoTX::set_power_mw(uint16_t power)
 {
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && power >= _power_levels[i].mw; i++) {
         if (power == _power_levels[i].mw) {
             _current_power = i;
             break;
@@ -391,12 +444,45 @@ bool AP_VideoTX::update_options() const
     return false;
 }
 
+void AP_VideoTX::set_preset(uint8_t preset_no)
+{
+    switch (preset_no)
+    {
+    case 0:
+        set_channel(_preset_1 % 10);
+        set_band(_preset_1 / 10);
+        break;
+    case 1:
+        set_channel(_preset_2 % 10);
+        set_band(_preset_2 / 10);
+        break;
+    case 2:
+        set_channel(_preset_3 % 10);
+        set_band(_preset_3 / 10);
+        break;
+    case 3:
+        set_channel(_preset_4 % 10);
+        set_band(_preset_4 / 10);
+        break;
+    case 4:
+        set_channel(_preset_5 % 10);
+        set_band(_preset_5 / 10);
+        break;
+    case 5:
+        set_channel(_preset_6 % 10);
+        set_band(_preset_6 / 10);
+        break;
+    default:
+        break;
+    }
+}
+
 bool AP_VideoTX::update_power() const {
     if (!_defaults_set || _power_mw == get_power_mw() || get_pitmode()) {
         return false;
     }
     // check that the requested power is actually allowed
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && _power_mw >= _power_levels[i].mw; i++) {
         if (_power_mw == _power_levels[i].mw
             && _power_levels[i].active != PowerActive::Inactive) {
             return true;
