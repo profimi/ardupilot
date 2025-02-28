@@ -263,7 +263,7 @@ private:
 #if HAL_WITH_ESC_TELEM
     AP_Int8 esc_index;
 #endif
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     AP_OSD_Setting pld_arm{false, 1, 1};
 #endif
 
@@ -352,7 +352,7 @@ private:
     void draw_rc_lq(uint8_t x, uint8_t y);
 #endif
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     void draw_pld_arm(uint8_t x, uint8_t y);
 #endif
 
@@ -598,7 +598,7 @@ public:
     AP_Int8 failsafe_scr;
     AP_Int32 button_delay_ms;
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     AP_Int8 pld_relay;
     AP_Int16 pld_timeout;
 #endif

@@ -60,7 +60,7 @@ public:
         BAND_A,
         BAND_o = BAND_A,
         BAND_B,
-        BAND_x = BAND_B
+        BAND_x = BAND_B,
         BAND_E,
         FATSHARK,  // Airwave
         BAND_F = FATSHARK,

@@ -1174,7 +1174,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info2[] = {
     AP_GROUPINFO("ESC_IDX", 10, AP_OSD_Screen, esc_index, 0),
 #endif
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     // @Param: PLD_ARM_EN
     // @DisplayName: PLD_ARM_EN
     // @Description: Displays payload arming
@@ -2568,7 +2568,7 @@ void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
 }
 #endif
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
 void AP_OSD_Screen::draw_pld_arm(uint8_t x, uint8_t y)
 {
     AP_Relay *relay = AP_Relay::get_singleton();
@@ -2702,7 +2702,7 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(rc_lq);
 #endif
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     DRAW_SETTING(pld_arm);
 #endif
 }

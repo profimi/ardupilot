@@ -257,7 +257,7 @@ const AP_Param::GroupInfo AP_OSD::var_info[] = {
     AP_SUBGROUPINFO(param_screen[1], "6_", 22, AP_OSD, AP_OSD_ParamScreen),
 #endif
 
-#if PLD_ENABLED
+#if PLD_ARMING_ENABLED
     // @Param: _PLD_RLY
     // @DisplayName: Payload relay number
     // @Description: Which relay is used for payload arm
