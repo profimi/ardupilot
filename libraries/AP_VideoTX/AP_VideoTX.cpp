@@ -80,38 +80,38 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: PRESET1
     // @DisplayName: Preset #1
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset_1, 00),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset[0], 00),
 
     // @Param: PRESET2
     // @DisplayName: Preset #2
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset_2, 01),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset[1], 01),
 
     // @Param: PRESET3
     // @DisplayName: Preset #3
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset_3, 02),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset[2], 02),
 
     // @Param: PRESET4
     // @DisplayName: Preset #4
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset_4, 03),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset[3], 03),
 
     // @Param: PRESET5
     // @DisplayName: Preset #5
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset_5, 04),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset[4], 04),
 
     // @Param: PRESET6
     // @DisplayName: Preset #6
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 99
-    AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset_6, 05),
+    // @Range: 0 255
+    AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset[5], 05),
 
     // @Param: POW_LEVELS
     // @DisplayName: Power level count
@@ -135,21 +135,22 @@ const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L","1G3_A","1G3_B"
 
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
 {
-    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* Band A, o */
-    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* Band B, x */
-    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* Band E */
-    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* Airwave,FATSHARK, F */
-    { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* Race, R */
-    { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* LO Race, L */
-    { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* Band 1G3_A */
-    { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* Band 1G3_B */
-    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* Band X, b */
-    { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* Band 3G3_A */
-    { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* Band 3G3_B */
-    { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* Band P, H */
-    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* Band U */
-    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* Band O */
-    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* Band S */
+    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o */
+    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x */
+    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E */
+    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F */
+    { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* 4 Race, R */
+    { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 LO Race, L */
+    { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
+    { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
+    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b */
+    { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* 9 Band 3G3_A */
+    { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
+    { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* B Band P, H */
+    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* C Band U */
+    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* D Band O */
+    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* E Band S */
+    { 6080, 60100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
 };
 
 // mapping of power level to milliwatt to dbm
@@ -446,35 +447,13 @@ bool AP_VideoTX::update_options() const
 
 void AP_VideoTX::set_preset(uint8_t preset_no)
 {
-    switch (preset_no)
-    {
-    case 0:
-        set_channel(_preset_1 % 10);
-        set_band(_preset_1 / 10);
-        break;
-    case 1:
-        set_channel(_preset_2 % 10);
-        set_band(_preset_2 / 10);
-        break;
-    case 2:
-        set_channel(_preset_3 % 10);
-        set_band(_preset_3 / 10);
-        break;
-    case 3:
-        set_channel(_preset_4 % 10);
-        set_band(_preset_4 / 10);
-        break;
-    case 4:
-        set_channel(_preset_5 % 10);
-        set_band(_preset_5 / 10);
-        break;
-    case 5:
-        set_channel(_preset_6 % 10);
-        set_band(_preset_6 / 10);
-        break;
-    default:
-        break;
-    }
+    assert(preset_no <= sizeof _preset && "preset_no is out of range");
+    if(preset_no > sizeof _preset)
+        return;
+    // Note: heximal instead of the decimal digit system is used to cover up to 16 bands
+    const uint8_t  band = _preset[preset_no] / 0x10;
+    set_band(band);
+    set_channel(_preset[preset_no] % 0x10);
 }
 
 bool AP_VideoTX::update_power() const {

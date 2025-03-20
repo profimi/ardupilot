@@ -80,6 +80,7 @@ public:
         BAND_U,
         BAND_O,
         BAND_S,
+        BAND_C,
         MAX_BANDS
     };
 
@@ -220,18 +221,7 @@ private:
     bool _current_enabled;
 
     // Preset block
-    AP_Int8 _preset_1;
-    AP_Int8 _current_preset_1;
-    AP_Int8 _preset_2;
-    AP_Int8 _current_preset_2;
-    AP_Int8 _preset_3;
-    AP_Int8 _current_preset_3;
-    AP_Int8 _preset_4;
-    AP_Int8 _current_preset_4;
-    AP_Int8 _preset_5;
-    AP_Int8 _current_preset_5;
-    AP_Int8 _preset_6;
-    AP_Int8 _current_preset_6;
+    AP_Int8  _preset[6];
 
     AP_Int8 _num_active_levels;
 
