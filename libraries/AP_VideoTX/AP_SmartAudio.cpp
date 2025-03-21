@@ -425,10 +425,10 @@ void AP_SmartAudio::set_frequency(uint16_t frequency, bool isPitModeFreq)
 }
 
 // enqueue a set channel request
-void AP_SmartAudio::set_channel(uint8_t channel)
+void AP_SmartAudio::set_channel(uint16_t channel)
 {
     debug("Setting channel to %d", channel);
-    push_uint8_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, channel);
+    push_uint16_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, channel);
 }
 
 /**

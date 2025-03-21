@@ -77,12 +77,13 @@ public:
         // Custom bands
         BAND_P,
         BAND_H = BAND_P,
+        BAND_l,
         BAND_U,
         BAND_O,
         BAND_S,
         BAND_C,
         MAX_BANDS
-        // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp should be
+        // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp have been
         // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
     };
 

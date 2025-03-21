@@ -838,11 +838,14 @@ void AP_CRSF_Telem::update_vtx_params()
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_FREQ;
             _telem.ext.command.payload[1] = (vtx.get_frequency_mhz() & 0xFF00) >> 8;
             _telem.ext.command.payload[2] = (vtx.get_frequency_mhz() & 0xFF);
+            ++len;
             _vtx_freq_update = false;
-            len++;
         } else if (_vtx_freq_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_CHANNEL;
-            _telem.ext.command.payload[1] = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            const uint16_t  chan = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            _telem.ext.command.payload[1] = chan >> 8;
+            _telem.ext.command.payload[2] = chan & 0xFF;
+            ++len;
             _vtx_freq_update = true;
         } else if (_vtx_power_change_pending && _vtx_dbm_update) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER_DBM;

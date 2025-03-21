@@ -80,32 +80,32 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: PRESET1
     // @DisplayName: Preset #1
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1)
-    // @Range: 0 157
+    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1) = 167
+    // @Range: 0 167
     AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset[0], 00),
 
     // @Param: PRESET2
     // @DisplayName: Preset #2
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 157
+    // @Range: 0 167
     AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset[1], 01),
 
     // @Param: PRESET3
     // @DisplayName: Preset #3
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 157
+    // @Range: 0 167
     AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset[2], 02),
 
     // @Param: PRESET4
     // @DisplayName: Preset #4
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 157
+    // @Range: 0 167
     AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset[3], 03),
 
     // @Param: PRESET5
     // @DisplayName: Preset #5
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 157
+    // @Range: 0 167
     AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset[4], 04),
 
     // @Param: PRESET6
@@ -141,17 +141,20 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
     { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E */
     { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F */
     { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* 4 Race, R */
-    { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 LO Race, L */
+    { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L */
+    // { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 LO Race, L */
     { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
     { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
     { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b */
     { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* 9 Band 3G3_A */
     { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
+    // Custom Bnds
     { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* B Band P, H */
-    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* C Band U */
-    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* D Band O */
-    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* E Band S */
-    { 6080, 60100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
+    { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK */
+    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U */
+    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O */
+    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F Band S */
+    { 6080, 60100, 5362, 5658, 5945, 6002, 6028, 6054}, /* G Band C, Custom */
 };
 
 // mapping of power level to milliwatt to dbm
