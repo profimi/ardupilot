@@ -263,6 +263,10 @@ private:
 #if HAL_WITH_ESC_TELEM
     AP_Int8 esc_index;
 #endif
+
+#ifndef PLD_ARMING_ENABLED
+#define PLD_ARMING_ENABLED 0
+#endif  // PLD_ARMING_ENABLED
 #if PLD_ARMING_ENABLED
     AP_OSD_Setting pld_arm{false, 1, 1};
 #endif
