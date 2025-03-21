@@ -28,6 +28,11 @@ class LinuxHWDef(hwdef.HWDef):
                 f.write('#define %s\n' % d[7:])
 
         self.write_SPI_config(f)
+        self.write_IMU_config(f)
+        self.write_MAG_config(f)
+        self.write_BARO_config(f)
+
+        self.write_env_py(os.path.join(self.outdir, "env.py"))
 
     def process_line(self, line, depth):
         '''process one line of pin definition file'''
@@ -43,7 +48,7 @@ class LinuxHWDef(hwdef.HWDef):
 
     def process_line_undef(self, line, depth, a):
         for u in a[1:]:
-            for dev in self.spidev:
+            for dev in self.linux_spidev:
                 if u == dev[0]:
                     self.linux_spidev.remove(dev)
 
