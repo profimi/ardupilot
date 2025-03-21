@@ -80,43 +80,44 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: PRESET1
     // @DisplayName: Preset #1
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1)
+    // @Range: 0 157
     AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset[0], 00),
 
     // @Param: PRESET2
     // @DisplayName: Preset #2
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // @Range: 0 157
     AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset[1], 01),
 
     // @Param: PRESET3
     // @DisplayName: Preset #3
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // @Range: 0 157
     AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset[2], 02),
 
     // @Param: PRESET4
     // @DisplayName: Preset #4
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // @Range: 0 157
     AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset[3], 03),
 
     // @Param: PRESET5
     // @DisplayName: Preset #5
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // @Range: 0 157
     AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset[4], 04),
 
     // @Param: PRESET6
     // @DisplayName: Preset #6
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 255
+    // @Range: 0 157
     AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset[5], 05),
 
     // @Param: POW_LEVELS
     // @DisplayName: Power level count
     // @Description: How many proper power levels has been configured
-    // @Range: 0 45
+    // @Range: 0 157
     AP_GROUPINFO("POW_LEVELS", 32, AP_VideoTX, _num_active_levels, 6),
 
     AP_GROUPEND
@@ -451,9 +452,8 @@ void AP_VideoTX::set_preset(uint8_t preset_no)
     if(preset_no > sizeof _preset)
         return;
     // Note: heximal instead of the decimal digit system is used to cover up to 16 bands
-    const uint8_t  band = _preset[preset_no] / 0x10;
-    set_band(band);
-    set_channel(_preset[preset_no] % 0x10);
+    set_band(_preset[preset_no] / 10);
+    set_channel(_preset[preset_no] % 10);
 }
 
 bool AP_VideoTX::update_power() const {

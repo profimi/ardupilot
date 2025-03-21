@@ -82,6 +82,8 @@ public:
         BAND_S,
         BAND_C,
         MAX_BANDS
+        // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp should be
+        // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
     };
 
     enum class PowerActive {
@@ -220,8 +222,8 @@ private:
     AP_Int8 _enabled;
     bool _current_enabled;
 
-    // Preset block
-    AP_Int8  _preset[6];
+    // Preset block:  BBC (band 0..15 and channel 0..7)
+    AP_Int16  _preset[6];
 
     AP_Int8 _num_active_levels;
 
