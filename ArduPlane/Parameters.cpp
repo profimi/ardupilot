@@ -1325,20 +1325,24 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(systemid, "SID", 38, ParametersG2, AP_SystemID),
 #endif
 
+// Custom Parameters ----------------------------------------------------------
+// WARNING: Long paramater name might cause failure in parameter reading by MavLink:
+// THROTTLE_ALT_MIN works fine, but AUTOTHROTTLE_ALT_MIN fails Mavlink connection in Mission Planner
+
     // @Param: TAKEOFF_UNSAFE
     // @DisplayName: Takeoff without GPS enable
     // @Description: Allows to use takeoff mode without GPS
     // @Values: 0:Disable, 1:Enable
     // @User: Standard
-    AP_GROUPINFO("TAKEOFF_UNSAFE", 39, ParametersG2, takeoff_unsafe, TAKEOFF_UNSAFE),
-
-    // @Param: AUTOTHROTTLE_ALT_MIN
+    AP_GROUPINFO("TAKEOFF_UNSAFE", 40, ParametersG2, takeoff_unsafe, TAKEOFF_UNSAFE),
+    
+    // @Param: THROTTLE_ALT_MIN
     // @DisplayName: Minimum altitude to allow throttle in automatic throttle modes
     // @Description: Allow throttle in automatic throttle modes on lower altitudes than default 10m ATO. Useful in mountain conditions
     // @Range -1000 1000
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("AUTOTHROTTLE_ALT_MIN", 40, ParametersG2, autothrottle_alt_min, AUTOTHROTTLE_ALT_MIN),
+    AP_GROUPINFO("THROTTLE_ALT_MIN", 41, ParametersG2, throttle_alt_min, THROTTLE_ALT_MIN),
 
     AP_GROUPEND
 };
@@ -1346,10 +1350,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 ParametersG2::ParametersG2(void) :
     unused_integer{1}
 #if HAL_BUTTON_ENABLED
-    ,button_ptr(&plane.button)
+    , button_ptr(&plane.button)
 #endif
 #if HAL_SOARING_ENABLED
-    ,soaring_controller(plane.TECS_controller, plane.aparm)
+    , soaring_controller(plane.TECS_controller, plane.aparm)
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);

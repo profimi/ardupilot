@@ -133,8 +133,8 @@ bool Plane::suppress_throttle(void)
         return true;
     }
     
-    if (fabsf(relative_altitude) >= g2.autothrottle_alt_min) {
-        // we're more than autothrottle_alt_min from the home altitude
+    if (fabsf(relative_altitude) >= g2.throttle_alt_min) {
+        // we're more than throttle_alt_min from the home altitude
         throttle_suppressed = false;
         return false;
     }

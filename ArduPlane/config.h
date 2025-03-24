@@ -227,6 +227,6 @@
     #define TAKEOFF_UNSAFE 0
 #endif
 
-#ifndef AUTOTHROTTLE_ALT_MIN
-    #define AUTOTHROTTLE_ALT_MIN 10.0f
+#ifndef THROTTLE_ALT_MIN
+    #define THROTTLE_ALT_MIN 10.0f
 #endif

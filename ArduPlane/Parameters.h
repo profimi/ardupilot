@@ -362,7 +362,7 @@ public:
         k_param_takeoff_throttle_idle,
 
         k_param_takeoff_unsafe,
-        k_param_autothrottle_alt_min,
+        k_param_throttle_alt_min,
 
         k_param_pullup = 270,
         k_param_quicktune,
@@ -591,7 +591,7 @@ public:
     AP_Int8         axis_bitmask; // axes to be autotuned
 
     AP_Int8         takeoff_unsafe;
-    AP_Float        autothrottle_alt_min;
+    AP_Float        throttle_alt_min;
 #if AP_RANGEFINDER_ENABLED
     // orientation of rangefinder to use for landing
     AP_Int8 rangefinder_land_orient;
