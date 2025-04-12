@@ -59,7 +59,7 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Description: Video Transmitter Frequency. The frequency is derived from the setting of BAND and CHANNEL
     // @User: Standard
     // @ReadOnly: True
-    // @Range: 1000 6000
+    // @Range: 1000 6100
     AP_GROUPINFO("FREQ",  5, AP_VideoTX, _frequency_mhz, 0),
 
     // @Param: OPTIONS
@@ -80,45 +80,45 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: PRESET1
     // @DisplayName: Preset #1
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1) = 167
-    // @Range: 0 167
+    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1) = 167 < 317 ((2^5-1)*10 + 2^3-1)
+    // @Range: 0 317
     AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset[0], 00),
 
     // @Param: PRESET2
     // @DisplayName: Preset #2
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 167
+    // @Range: 0 317
     AP_GROUPINFO("PRESET2", 9, AP_VideoTX, _preset[1], 01),
 
     // @Param: PRESET3
     // @DisplayName: Preset #3
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 167
+    // @Range: 0 317
     AP_GROUPINFO("PRESET3", 10, AP_VideoTX, _preset[2], 02),
 
     // @Param: PRESET4
     // @DisplayName: Preset #4
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 167
+    // @Range: 0 317
     AP_GROUPINFO("PRESET4", 11, AP_VideoTX, _preset[3], 03),
 
     // @Param: PRESET5
     // @DisplayName: Preset #5
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 167
+    // @Range: 0 317
     AP_GROUPINFO("PRESET5", 12, AP_VideoTX, _preset[4], 04),
 
     // @Param: PRESET6
     // @DisplayName: Preset #6
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // @Range: 0 157
+    // @Range: 0 317
     AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset[5], 05),
 
     // @Param: POW_LEVELS
     // @DisplayName: Power level count
     // @Description: How many proper power levels has been configured
-    // @Range: 0 157
-    AP_GROUPINFO("POW_LEVELS", 32, AP_VideoTX, _num_active_levels, 6),
+    // @Range: 0 7
+    AP_GROUPINFO("POW_LEVELS", 31, AP_VideoTX, _num_active_levels, 5),
 
     AP_GROUPEND
 };
@@ -153,8 +153,8 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
     { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK */
     { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U */
     { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O */
-    { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F Band S */
-    { 6080, 60100, 5362, 5658, 5945, 6002, 6028, 6054}, /* G Band C, Custom */
+    // { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F Band S */
+    { 6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
 };
 
 // mapping of power level to milliwatt to dbm
@@ -451,9 +451,11 @@ bool AP_VideoTX::update_options() const
 
 void AP_VideoTX::set_preset(uint8_t preset_no)
 {
-    assert(preset_no <= sizeof _preset && "preset_no is out of range");
-    if(preset_no > sizeof _preset)
+    // assert(preset_no < sizeof _preset && "preset_no is out of range");
+    if(preset_no >= sizeof _preset) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: preset_no = %u (>= %u)", preset_no, sizeof _preset);
         return;
+    }
     // Note: heximal instead of the decimal digit system is used to cover up to 16 bands
     set_band(_preset[preset_no] / 10);
     set_channel(_preset[preset_no] % 10);
@@ -608,6 +610,27 @@ void AP_VideoTX::change_power(int8_t position)
         }
         set_configured_power_mw(power);
     }
+}
+
+bool AP_VideoTX::band_valid(uint8_t band) const
+{
+    // VTX Band E [0, MAX_BANDS)
+    // assert(band < AP_VideoTX::VideoBand::MAX_BANDS && "The band value is out of range");
+    if (band >= AP_VideoTX::VideoBand::MAX_BANDS) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: band = %u (>= %u)", band, AP_VideoTX::VideoBand::MAX_BANDS);
+        return false;
+    }
+    return true;
+}
+
+bool AP_VideoTX::channel_valid(uint8_t channel) const
+{
+    // Channel: 0..7
+    if (channel >= 8) {
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: channel = %u (>= 8)", channel);
+        return false;
+    }
+    return true;
 }
 
 namespace AP {

@@ -148,15 +148,18 @@ public:
     bool update_power() const;
     // change the video power based on switch input
     void change_power(int8_t position);
+    // Validate band and channel
+    bool band_valid(uint8_t band) const;
+    bool channel_valid(uint8_t channel) const;
     // get / set the frequency band
-    void set_band(uint8_t band) { _current_band = band; }
-    void set_configured_band(uint8_t band) { _band.set_and_save_ifchanged(band); }
+    void set_band(uint8_t band) { if(band_valid(band)) _current_band = band; }
+    void set_configured_band(uint8_t band) { if(band_valid(band)) _band.set_and_save_ifchanged(band); }
     uint8_t get_configured_band() const { return _band; }
     uint8_t get_band() const { return _current_band; }
     bool update_band() const { return _defaults_set && _band != _current_band; }
     // get / set the frequency channel
-    void set_channel(uint8_t channel) { _current_channel = channel; }
-    void set_configured_channel(uint8_t channel) { _channel.set_and_save_ifchanged(channel); }
+    void set_channel(uint8_t channel) { if(channel_valid(channel)) _current_channel = channel; }
+    void set_configured_channel(uint8_t channel) { if(channel_valid(channel)) _channel.set_and_save_ifchanged(channel); }
     uint8_t get_configured_channel() const { return _channel; }
     uint8_t get_channel() const { return _current_channel; }
     bool update_channel() const { return _defaults_set && _channel != _current_channel; }

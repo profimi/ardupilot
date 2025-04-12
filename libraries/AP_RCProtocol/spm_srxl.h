@@ -149,16 +149,16 @@ typedef enum
     SRXL_CMD_BIND_INFO,
 } SRXL_CMD;
 
-// VTX Band
-#define VTX_BAND_FATSHARK   (0)
-#define VTX_BAND_RACEBAND   (1)
-#define VTX_BAND_E_BAND     (2)
-#define VTX_BAND_B_BAND     (3)
-#define VTX_BAND_A_BAND     (4)
+// // VTX Band (see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp)
+// #define VTX_BAND_FATSHARK   (0)
+// #define VTX_BAND_RACEBAND   (1)
+// #define VTX_BAND_E_BAND     (2)
+// #define VTX_BAND_B_BAND     (3)
+// #define VTX_BAND_A_BAND     (4)
 
-// VTX Pit Mode
-#define VTX_MODE_RACE   (0)
-#define VTX_MODE_PIT    (1)
+// // VTX Pit Mode
+// #define VTX_MODE_RACE   (0)
+// #define VTX_MODE_PIT    (1)
 
 // VTX Power
 #define VTX_POWER_OFF           (0)
@@ -279,10 +279,11 @@ typedef struct SrxlParamPacket
 } PACKED SrxlParamPacket;
 
 // VTX Data
+// Only bands A/B/E/F/R/L and channels 1-8 are supported, see https://www.expresslrs.org/software/serialvtx/
 typedef struct SrxlVtxData
 {
-    uint8_t band;       // VTX Band (0 = Fatshark, 1 = Raceband, 2 = E, 3 = B, 4 = A)
-    uint8_t channel;    // VTX Channel (0-7)
+    uint8_t band;       // VTX Band (0 = Fatshark, 1 = Raceband, 2 = E, 3 = B, 4 = A; 5 bit); see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp
+    uint8_t channel;    // VTX Channel (0-7; 3 bit)
     uint8_t pit;        // Pit/Race mode (0 = Race, 1 = Pit). Race = normal power, Pit = reduced power
     uint8_t power;      // VTX Power (0 = Off, 1 = 1mw to 14mW, 2 = 15mW to 25mW, 3 = 26mW to 99mW,
                         // 4 = 100mW to 299mW, 5 = 300mW to 600mW, 6 = 601mW+, 7 = manual control)
