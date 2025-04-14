@@ -70,10 +70,9 @@ public:
         AUTOLAND      = 26,
 #endif
 
-    // Mode number 30 reserved for "offboard" for external/lua control.
-    
-    // Custom
-        FLY_BY_WIRE_C = 31,
+        // Custom
+        FLY_BY_WIRE_C = 28,  // was 76
+        // Mode number 30 reserved for "offboard" for external/lua control.
     };
 
     // Constructor
@@ -640,7 +639,7 @@ public:
 
     bool does_automatic_thermal_switch() const override { return true; }
 
-    // methods that affect movement of the vehicle in this mode
+    // Methods that affect movement of the vehicle in this mode
     void update() override;
 
     bool does_auto_throttle() const override { return true; }

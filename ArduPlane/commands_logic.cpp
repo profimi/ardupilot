@@ -586,7 +586,7 @@ bool Plane::verify_takeoff()
     if (
         relative_alt_cm > auto_state.takeoff_altitude_rel_cm || // altitude reached
         plane.check_takeoff_timeout_level_off() // pitch level-off maneuver has timed out
-        ) {
+    ) {
         gcs().send_text(MAV_SEVERITY_INFO, "Takeoff complete at %.2fm",
                           (double)(relative_alt_cm*0.01f));
         steer_state.hold_course_cd = -1;

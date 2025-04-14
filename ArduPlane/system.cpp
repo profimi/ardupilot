@@ -342,6 +342,8 @@ bool Plane::set_mode(const uint8_t new_mode, const ModeReason reason)
 
 bool Plane::set_mode_by_number(const Mode::Number new_mode_number, const ModeReason reason)
 {
+    gcs().send_text(MAV_SEVERITY_INFO, "set_mode_by_number(): setting mode %u, reason: %u",
+        static_cast<uint8_t>(new_mode_number), static_cast<uint8_t>(reason));
     Mode *new_mode = plane.mode_from_mode_num(new_mode_number);
     if (new_mode == nullptr) {
         notify_no_such_mode(new_mode_number);
