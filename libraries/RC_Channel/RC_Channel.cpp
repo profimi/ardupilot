@@ -574,15 +574,19 @@ bool RC_Channel::read_6pos_switch(int8_t& position)
         return false;  // This is an error condition
     }
 
-    if (pulsewidth < 1231) {
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    if (pulsewidth < 1090) {
         position = 0;
-    } else if (pulsewidth < 1361) {
+    } else if (pulsewidth < 1294) {
         position = 1;
-    } else if (pulsewidth < 1491) {
+    } else if (pulsewidth < 1499) {
         position = 2;
-    } else if (pulsewidth < 1621) {
+    } else if (pulsewidth < 1704) {
         position = 3;
-    } else if (pulsewidth < 1750) {
+    } else if (pulsewidth < 1909) {
         position = 4;
     } else {
         position = 5;
