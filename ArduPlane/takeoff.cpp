@@ -19,7 +19,8 @@ bool Plane::auto_takeoff_check(void)
     if (!arming.is_armed_and_safety_off()) {
         memset(&takeoff_state, 0, sizeof(takeoff_state));
         auto_state.baro_takeoff_alt = barometer.get_altitude();
-        gcs().send_text(MAV_SEVERITY_INFO, "Takeoff omitted because !is_armed_and_safety_off; safety: %u", hal.util->safety_switch_state());
+        // if(is_armed())
+        //     GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "Takeoff omitted because !is_armed_and_safety_off; safety: %u", hal.util->safety_switch_state());
         return false;
     }
 

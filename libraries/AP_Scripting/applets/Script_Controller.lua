@@ -110,7 +110,7 @@ end
 
 --]]
 function compare_strings_ci(a,b)
-   return string.upper(a) == string.upper(b)
+   return (a == nil and b == nil) or (a ~= nil and b ~= nil and string.upper(a) == string.upper(b))
 end
 
 --[[
