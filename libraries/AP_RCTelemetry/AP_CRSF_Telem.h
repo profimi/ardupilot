@@ -86,7 +86,7 @@ public:
         uint8_t smart_audio_ver : 3;    // SmartAudio_V1 = 0, SmartAudio_V2 = 1
         // band / channel
         uint8_t channel : 3;            // 1x-8x
-        uint8_t band : 5;               // A, B, E, AirWave, Race
+        uint8_t band : 5;               // A, B, E, AirWave, Race; see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp
         uint16_t user_frequency;
         uint8_t power : 4;              // 25mW = 0, 200mW = 1, 500mW = 2, 800mW = 3
         uint8_t pitmode : 4;            // off = 0, In_Band = 1, Out_Band = 2;

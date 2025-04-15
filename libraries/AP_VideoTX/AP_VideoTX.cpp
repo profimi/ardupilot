@@ -600,10 +600,11 @@ void AP_VideoTX::change_power(int8_t position)
         }
     }
 
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX power to %u mw (#%u)", power, position);
     if (power == 0) {
-        if (!hal.util->get_soft_armed()) {    // don't allow pitmode to be entered if already armed
+        // NOTE: We might want to intentionally tur off VTX to reduce/hide our radio profile unil moving to some further location
+        // if (!hal.util->get_soft_armed())    // don't allow pitmode to be entered if already armed
             set_configured_options(get_configured_options() | uint8_t(VideoOptions::VTX_PITMODE));
-        }
     } else {
         if (has_option(VideoOptions::VTX_PITMODE)) {
             set_configured_options(get_configured_options() & ~uint8_t(VideoOptions::VTX_PITMODE));
