@@ -71,7 +71,7 @@ public:
 #endif
 
         // Custom
-        FLY_BY_WIRE_C = 28,  // was 76
+        FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronuously set to this value to support Flight mode switching from RC
         // Mode number 30 reserved for "offboard" for external/lua control.
     };
 
