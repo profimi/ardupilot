@@ -247,6 +247,7 @@ protected:
     bool _enter() override;
 };
 
+//  Plane follows a mission
 class ModeAuto : public Mode
 {
 public:
@@ -627,6 +628,7 @@ protected:
     bool _enter() override;
 };
 
+// Like FBWB but with automatic roll control and without taking pitch change from RC
 class ModeFBWC : public Mode
 {
 public:
