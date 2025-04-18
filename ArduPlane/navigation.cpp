@@ -373,7 +373,7 @@ void Plane::update_loiter(uint16_t radius)
 }
 
 /*
-  handle speed and height control in FBWB, CRUISE, and optionally, LOITER mode.
+  handle speed and height control in FBWB, CRUISE, FBWC and optionally, LOITER mode.
   The throttle is used to change target airspeed or throttle. And, optionally,
   the elevator is used to change target altitude.
  */

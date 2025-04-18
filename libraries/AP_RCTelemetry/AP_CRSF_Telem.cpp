@@ -463,13 +463,13 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
             update_vtx_params();
             break;
 #endif
-        case BATTERY: // BATTERY
+        case BATTERY:
             calc_battery();
             break;
-        case GPS: // GPS
+        case GPS:
             calc_gps();
             break;
-        case FLIGHT_MODE: // GPS
+        case FLIGHT_MODE:
             calc_flight_mode();
             break;
         case PASSTHROUGH:
@@ -1039,7 +1039,7 @@ void AP_CRSF_Telem::calc_flight_mode()
 {
     AP_Notify * notify = AP_Notify::get_singleton();
     if (notify) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "calc_flight_mode()  flightmode: %s", notify->get_flight_mode_str());
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "calc_flight_mode()  flightmode: %s", notify->get_flight_mode_str());
         // Note: snprintf() always terminates the string
         hal.util->snprintf(
             _telem.bcast.flightmode.flight_mode, 
