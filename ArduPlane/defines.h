@@ -138,13 +138,13 @@ enum {
     USE_REVERSE_THRUST_RTL                      = (1<<6),
     USE_REVERSE_THRUST_CIRCLE                   = (1<<7),
     USE_REVERSE_THRUST_CRUISE                   = (1<<8),
-    USE_REVERSE_THRUST_FBWB                     = (1<<9),
+    USE_REVERSE_THRUST_FBWB                     = (1<<9),  // Used by both FBWB and FBWC    
     USE_REVERSE_THRUST_GUIDED                   = (1<<10),
     USE_REVERSE_THRUST_AUTO_LANDING_PATTERN     = (1<<11),
-    USE_REVERSE_THRUST_FBWA                   = (1<<12),
-    USE_REVERSE_THRUST_ACRO                   = (1<<13),
-    USE_REVERSE_THRUST_STABILIZE            = (1<<14),
-    USE_REVERSE_THRUST_THERMAL             = (1<<15),
+    USE_REVERSE_THRUST_FBWA                     = (1<<12),
+    USE_REVERSE_THRUST_ACRO                     = (1<<13),
+    USE_REVERSE_THRUST_STABILIZE                = (1<<14),
+    USE_REVERSE_THRUST_THERMAL                  = (1<<15),
 };
 
 enum FlightOptions {

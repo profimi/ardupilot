@@ -189,11 +189,13 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     // @Bitmask{Plane}: 12:AVOID_ADSB
     // @Bitmask{Plane}: 13:Guided
     // @Bitmask{Plane}: 14:THERMAL
-    // @Bitmask{Plane}: 15:QSTABILIZE
-    // @Bitmask{Plane}: 16:QHOVER
-    // @Bitmask{Plane}: 17:QLOITER
-    // @Bitmask{Plane}: 18:QACRO
-    // @Bitmask{Plane}: 19:QAUTOTUNE
+    // @Bitmask{Plane}: 15: AUTOLAND
+    // @Bitmask{Plane}: 16: FBWC
+    // @Bitmask{Plane}: 17:QSTABILIZE
+    // @Bitmask{Plane}: 18:QHOVER
+    // @Bitmask{Plane}: 19:QLOITER
+    // @Bitmask{Plane}: 20:QACRO
+    // @Bitmask{Plane}: 21:QAUTOTUNE
     // @Bitmask{Rover}: 0:Manual
     // @Bitmask{Rover}: 1:Acro
     // @Bitmask{Rover}: 2:Steering

@@ -45,6 +45,7 @@ local MODE_QAUTOTUNE     = 22
 local MODE_QACRO         = 23
 local MODE_THERMAL       = 24
 local MODE_LOITER_ALT_QLAND = 25
+local MODE_FLY_BY_WIRE_C = 28
 
 local FS_enabled_in_mode = {}
 
@@ -56,6 +57,7 @@ FS_enabled_in_mode[MODE_TRAINING] = true
 FS_enabled_in_mode[MODE_ACRO] = true
 FS_enabled_in_mode[MODE_FLY_BY_WIRE_A] = true
 FS_enabled_in_mode[MODE_FLY_BY_WIRE_B] = true
+FS_enabled_in_mode[MODE_FLY_BY_WIRE_C] = true
 FS_enabled_in_mode[MODE_CRUISE] = true
 FS_enabled_in_mode[MODE_AUTOTUNE] = true
 FS_enabled_in_mode[MODE_AUTO] = false

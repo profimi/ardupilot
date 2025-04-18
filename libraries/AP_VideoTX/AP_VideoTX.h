@@ -21,7 +21,7 @@
 #include <AP_Param/AP_Param.h>
 
 constexpr uint8_t VTX_MAX_CHANNELS = 8;
-constexpr uint8_t VTX_MAX_POWER_LEVELS = 14;
+constexpr uint8_t VTX_MAX_POWER_LEVELS = 15;
 constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;
 
 class AP_VideoTX {

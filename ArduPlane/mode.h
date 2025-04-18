@@ -628,7 +628,7 @@ protected:
     bool _enter() override;
 };
 
-// Like FBWB but with automatic roll control and without taking pitch change from RC
+// Like FBWB but with automatic roll control and without taking pitch change from RC and without reacting on the right stick (see also STICK_MIXING)
 class ModeFBWC : public Mode
 {
 public:

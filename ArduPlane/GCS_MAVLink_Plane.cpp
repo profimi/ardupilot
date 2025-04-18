@@ -1599,6 +1599,7 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
 #if MODE_AUTOLAND_ENABLED
         &plane.mode_autoland,
 #endif
+        &plane.mode_fbwc,
     };
 
     const uint8_t fw_mode_count = ARRAY_SIZE(fw_modes);
@@ -1632,6 +1633,7 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
     const uint8_t index_zero = index - 1;
     if (index_zero >= mode_count) {
         // Mode does not exist!?
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "send_available_mode(index) failed:  index: %u > mode_count: %u", index, mode_count);
         return mode_count;
     }
 
@@ -1643,7 +1645,6 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
         // A fixedwing mode
         name = fw_modes[index_zero]->name();
         mode_number = (uint8_t)fw_modes[index_zero]->mode_number();
-
     } else {
 #if HAL_QUADPLANE_ENABLED
         // A Quadplane mode
@@ -1655,6 +1656,8 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
         return mode_count;
 #endif
     }
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "send_available_mode()  mode_name: %s, index: %u, mode_count: %u, fw_mode_count: %u",
+        name, index, mode_count, fw_mode_count);
 
     mavlink_msg_available_modes_send(
         chan,

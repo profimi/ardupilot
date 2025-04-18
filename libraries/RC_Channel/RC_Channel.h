@@ -309,8 +309,12 @@ public:
         SCRIPTING_15 =       314,
         SCRIPTING_16 =       315,
 
+        // Custom AUX functions
+        FBWB =                316, // Fly-By-Wire-B
+        FBWC =                317, // Fly-By-Wire-C
+
         // this must be higher than any aux function above
-        AUX_FUNCTION_MAX =   316,
+        AUX_FUNCTION_MAX =   318,
     };
 
     // auxiliary switch handling (n.b.: we store this as 2-bits!):
