@@ -291,6 +291,10 @@ public:
         // inputs 248-249 are reserved for the Skybrush fork at
         // https://github.com/skybrush-io/ardupilot
 
+        // Custom AUX functions
+        FBWB =                250, // Fly-By-Wire-B
+        FBWC =                251, // Fly-By-Wire-C
+
         // inputs for the use of onboard lua scripting
         SCRIPTING_1 =        300,
         SCRIPTING_2 =        301,
@@ -309,12 +313,8 @@ public:
         SCRIPTING_15 =       314,
         SCRIPTING_16 =       315,
 
-        // Custom AUX functions
-        FBWB =                316, // Fly-By-Wire-B
-        FBWC =                317, // Fly-By-Wire-C
-
         // this must be higher than any aux function above
-        AUX_FUNCTION_MAX =   318,
+        AUX_FUNCTION_MAX =   316,
     };
 
     // auxiliary switch handling (n.b.: we store this as 2-bits!):
