@@ -73,7 +73,7 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @DisplayName: Video Transmitter Max Power Level
     // @Description: Video Transmitter Maximum Power Level. Different VTXs support different power levels, this prevents the power aux switch from requesting too high a power level. The switch supports 6 power levels and the selected power will be a subdivision between 0 and this setting.
     // @Range: 25 3000
-    AP_GROUPINFO("MAX_POWER", 7, AP_VideoTX, _max_power_mw, 1000),
+    AP_GROUPINFO("MAX_POWER", 7, AP_VideoTX, _max_power_mw, 2500),
 
     // Presets //////////////////////////////////////////////////
 
@@ -164,18 +164,18 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     // level, mw, dbm, dac
     { 0xFF,  0,    0, 0    }, // only in SA 2.1
-    { 0,    25,   14, 7    },
+    { 0,    25,   14, 7    }, // D1
     { 0x11, 100,  20, 0xFF }, // only in SA 2.1
     { 1,    200,  23, 16   },
     { 0x12, 400,  26, 0xFF }, // only in SA 2.1
-    { 2,    500,  27, 25   },
+    { 2,    500,  27, 25   }, // D1
     { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
     { 3,    800,  29, 40   },
-    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1
-    { 4,    1400, 31, 80   },
+    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1
+    { 0x1A, 1400, 31, 0xFF },
     { 0x21, 1800, 32, 0xFF }, // only in SA 2.1
     { 0x22, 2000, 33, 0xFF }, // only in SA 2.1
-    { 0x23, 2500, 34, 0xFF }, // only in SA 2.1
+    { 0x23, 2500, 34, 0xFF }, // only in SA 2.1; D1
     { 0x24, 3000, 35, 0xFF }, // only in SA 2.1
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
