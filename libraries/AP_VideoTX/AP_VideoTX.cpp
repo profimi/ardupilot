@@ -118,7 +118,13 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @DisplayName: Power level count
     // @Description: How many proper power levels has been configured
     // @Range: 0 7
-    AP_GROUPINFO("POW_LEVELS", 31, AP_VideoTX, _num_active_levels, 5),
+    AP_GROUPINFO("POW_LEVELS", 14, AP_VideoTX, _num_active_levels, 6),
+
+    // @Param: MODEL
+    // @DisplayName: VTX Model
+    // @Description: VTX Model: 0 generic,  D1, ...
+    // @Range: 0 7
+    AP_GROUPINFO("MODEL", 15, AP_VideoTX, _model, 1),
 
     AP_GROUPEND
 };
@@ -161,6 +167,8 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 // valid power levels from SmartAudio spec, the adjacent levels might be the actual values
 // so these are marked as level + 0x10 and will be switched if a dbm message proves it
 // Ascedenting ordering of this table by the power in mw is essential
+// D1 Note: power switching works for SamertAudio and fails for the original IRC Tramp that uses power_mw value,
+// where D1 requires power_dbm value
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     // level, mw, dbm, dac
     { 0xFF,  0,    0, 0    }, // only in SA 2.1
@@ -172,13 +180,34 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
     { 3,    800,  29, 40   },
     { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1
-    { 0x1A, 1400, 31, 0xFF },
-    { 0x21, 1800, 32, 0xFF }, // only in SA 2.1
+    // { 0x1A, 1200, 31, 0xFF },
+    { 0x21, 1600, 32, 0xFF }, // only in SA 2.1
     { 0x22, 2000, 33, 0xFF }, // only in SA 2.1
     { 0x23, 2500, 34, 0xFF }, // only in SA 2.1; D1
     { 0x24, 3000, 35, 0xFF }, // only in SA 2.1
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
+
+// AKK power levels
+// 25/250/500/1000/2000/3000mW
+// 200 400 800 1600
+// 25 200 600 1200
+
+// // Original VTX values from Ardupilot master
+// AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
+//     // level, mw, dbm, dac
+//     { 0xFF,  0,    0, 0    }, // only in SA 2.1
+//     { 0,    25,   14, 7    },
+//     { 0x11, 100,  20, 0xFF }, // only in SA 2.1
+//     { 1,    200,  23, 16   },
+//     { 0x12, 400,  26, 0xFF }, // only in SA 2.1
+//     { 2,    500,  27, 25   },
+//     { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
+//     { 3,    800,  29, 40   },
+//     { 0x13, 1000, 30, 0xFF }, // only in SA 2.1
+//     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
+// };
+
 
 AP_VideoTX::AP_VideoTX()
 {
