@@ -221,7 +221,7 @@ void AP_SmartAudio::update_vtx_params()
             if (_vtx_use_set_freq) {
                 set_frequency(vtx.get_configured_frequency_mhz(), false);
             } else {
-                set_channel(static_cast<uint16_t>(vtx.get_configured_band()) * VTX_MAX_CHANNELS + vtx.get_configured_channel());
+                set_channel(vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel());
             }
         } else if (_vtx_power_change_pending) {
             debug("update power (ver %u)", _protocol_version);
@@ -425,10 +425,10 @@ void AP_SmartAudio::set_frequency(uint16_t frequency, bool isPitModeFreq)
 }
 
 // enqueue a set channel request
-void AP_SmartAudio::set_channel(uint16_t channel)
+void AP_SmartAudio::set_channel(uint8_t channel)
 {
     debug("Setting channel to %d", channel);
-    push_uint16_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, channel);
+    push_uint8_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, channel);
 }
 
 /**
