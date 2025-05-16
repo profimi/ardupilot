@@ -171,7 +171,7 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 // where D1 requires power_dbm value
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     // level, mw, dbm, dac
-    { 0xFF,  0,    0, 0    }, // only in SA 2.1
+    { 0xFF, 0,    0, 0    }, // only in SA 2.1
     { 0,    25,   14, 7    }, // D1
     { 0x11, 100,  20, 0xFF }, // only in SA 2.1
     { 1,    200,  23, 16   },
@@ -180,7 +180,7 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
     { 3,    800,  29, 40   },
     { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1
-    // { 0x1A, 1200, 31, 0xFF },
+    { 0x1A, 1200, 31, 0xFF },
     { 0x21, 1600, 32, 0xFF }, // only in SA 2.1
     { 0x22, 2000, 33, 0xFF }, // only in SA 2.1
     { 0x23, 2500, 34, 0xFF }, // only in SA 2.1; D1
@@ -218,6 +218,24 @@ AP_VideoTX::AP_VideoTX()
     singleton = this;
 
     AP_Param::setup_object_defaults(this, var_info);
+
+    // Correct static tables to match object parameters
+    // Make inactive power levels exceeding the power capacity of the target VTX
+    switch (model()) {
+    case Model::D1: {
+        constexpr uint16_t  d1PwrMwMax = 2500;
+        for(uint8_t  i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
+            if(_power_levels[i].active != PowerActive::Inactive) {
+                if(_power_levels[i].mw > d1PwrMwMax)
+                    _power_levels[i].active = PowerActive::Inactive;
+                else break;
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 AP_VideoTX::~AP_VideoTX(void)

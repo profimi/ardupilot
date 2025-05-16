@@ -128,11 +128,11 @@ char AP_Tramp::handle_response(void)
             }
 
             switch(vtx.model()) {
-                case AP_VideoTX::Model::D1:
-                    vtx.set_power_dbm(static_cast<uint8_t>(power));  // D1 uses power dbm values rather than power mw values
-                    break;
-                default:
-                    vtx.set_power_mw(power);
+            case AP_VideoTX::Model::D1:
+                vtx.set_power_dbm(static_cast<uint8_t>(power));  // D1 uses power dbm values rather than power mw values
+                break;
+            default:
+                vtx.set_power_mw(power);
             }
             if (pit_mode) {
                 vtx.set_options(vtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
@@ -360,11 +360,11 @@ void AP_Tramp::process_requests()
                 // Power can be and needs to be updated, issue request
                 uint16_t  power = 0;
                 switch(vtx.model()) {
-                    case AP_VideoTX::Model::D1:
-                        power = vtx.get_configured_power_dbm();  // D1 uses power dbm values rather than power mw values
-                        break;
-                    default:
-                        power = vtx.get_configured_power_mw();
+                case AP_VideoTX::Model::D1:
+                    power = vtx.get_configured_power_dbm();  // D1 uses power dbm values rather than power mw values
+                    break;
+                default:
+                    power = vtx.get_configured_power_mw();
                 }
                 send_command('P', power);
 
