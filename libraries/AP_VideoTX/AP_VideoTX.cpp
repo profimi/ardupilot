@@ -140,6 +140,9 @@ extern const AP_HAL::HAL& hal;
 
 const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L","1G3_A","1G3_B","X","3G3_A","3G3_B","P","U","O","S"};
 
+// CAUTION: MAX_BANDS * VTX_MAX_CHANNELS <= 256 (1 byte), otherwise libraries/AP_RCTelemetry/AP_CRSF_Telem.cpp, update_vtx_params()
+// and other functions should be updated
+static_assert(AP_VideoTX::MAX_BANDS * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
 {
     { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o */
