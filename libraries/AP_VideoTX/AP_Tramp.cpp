@@ -131,6 +131,10 @@ char AP_Tramp::handle_response(void)
             case AP_VideoTX::Model::D1:
                 vtx.set_power_dbm(static_cast<uint8_t>(power));  // D1 uses power dbm values rather than power mw values
                 break;
+            case AP_VideoTX::Model::FXR10:
+            case AP_VideoTX::Model::CUSTOM:
+                vtx.set_power_val(power);
+                break;
             default:
                 vtx.set_power_mw(power);
             }
@@ -362,6 +366,10 @@ void AP_Tramp::process_requests()
                 switch(vtx.model()) {
                 case AP_VideoTX::Model::D1:
                     power = vtx.get_configured_power_dbm();  // D1 uses power dbm values rather than power mw values
+                    break;
+                case AP_VideoTX::Model::FXR10:
+                case AP_VideoTX::Model::CUSTOM:
+                    power = vtx.get_configured_power_val();
                     break;
                 default:
                     power = vtx.get_configured_power_mw();

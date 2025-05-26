@@ -22,6 +22,8 @@
 
 #include <AP_HAL/AP_HAL.h>
 
+#include <algorithm>
+
 extern const AP_HAL::HAL& hal;
 
 AP_VideoTX *AP_VideoTX::singleton;
@@ -72,7 +74,7 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: MAX_POWER
     // @DisplayName: Video Transmitter Max Power Level
     // @Description: Video Transmitter Maximum Power Level. Different VTXs support different power levels, this prevents the power aux switch from requesting too high a power level. The switch supports 6 power levels and the selected power will be a subdivision between 0 and this setting.
-    // @Range: 25 3000
+    // @Range: 25 10000
     AP_GROUPINFO("MAX_POWER", 7, AP_VideoTX, _max_power_mw, 2500),
 
     // Presets //////////////////////////////////////////////////
@@ -114,17 +116,89 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Range: 0 317
     AP_GROUPINFO("PRESET6", 13, AP_VideoTX, _preset[5], 05),
 
-    // @Param: POW_LEVELS
-    // @DisplayName: Power level count
-    // @Description: How many proper power levels has been configured
-    // @Range: 0 7
-    AP_GROUPINFO("POW_LEVELS", 14, AP_VideoTX, _num_active_levels, 6),
-
     // @Param: MODEL
     // @DisplayName: VTX Model
     // @Description: VTX Model: 0 generic,  D1, ...
-    // @Range: 0 7
-    AP_GROUPINFO("MODEL", 15, AP_VideoTX, _model, 1),
+    // @Range: 0 9
+    AP_GROUPINFO("MODEL", 14, AP_VideoTX, _model, 1),
+
+    // @Param: POW_LEVELS
+    // @DisplayName: Power level count
+    // @Description: How many proper power levels has been configured, < VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6
+    // @Range: 0 VTX_MAX_ADJUSTABLE_POWER_LEVELS
+    AP_GROUPINFO("POW_LEVELS", 15, AP_VideoTX, _num_active_levels, 6),
+
+    // @Param: POW_CVAL1
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL1", 16, AP_VideoTX, _cvals[0], 0),
+
+    // @Param: POW_CVAL2
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL2", 17, AP_VideoTX, _cvals[1], 1),
+
+    // @Param: POW_CVAL3
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL3", 18, AP_VideoTX, _cvals[2], 2),
+
+    // @Param: POW_CVAL4
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL4", 19, AP_VideoTX, _cvals[3], 3),
+
+    // @Param: POW_CVAL5
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL5", 20, AP_VideoTX, _cvals[4], 4),
+
+    // @Param: POW_CVAL6
+    // @DisplayName: VTX custom power value
+    // @Description: VTX custom power values specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CVAL6", 21, AP_VideoTX, _cvals[5], 5),
+
+    // @Param: POW_CMW1
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW1", 22, AP_VideoTX, _cmws[0], 0),
+
+    // @Param: POW_CMW2
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW2", 23, AP_VideoTX, _cmws[1], 0),
+
+    // @Param: POW_CMW3
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW3", 24, AP_VideoTX, _cmws[2], 0),
+
+    // @Param: POW_CMW4
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW4", 25, AP_VideoTX, _cmws[3], 0),
+
+    // @Param: POW_CMW5
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW5", 26, AP_VideoTX, _cmws[4], 0),
+
+    // @Param: POW_CMW6
+    // @DisplayName: VTX custom power in mW
+    // @Description: VTX custom power in mW specified by the hardware producer
+    // @Range: 0 32767
+    AP_GROUPINFO("POW_CMW6", 27, AP_VideoTX, _cmws[5], 0),
 
     AP_GROUPEND
 };
@@ -138,31 +212,39 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
 
 extern const AP_HAL::HAL& hal;
 
-const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L","1G3_A","1G3_B","X","3G3_A","3G3_B","P","U","O","S"};
+const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L",
+    "AKK5_F", // "1G3_A",
+    "AKK5_L", // "1G3_B",
+    "X","3G3_A","3G3_B","P", "l","U","O","C" // "D1_S", "AKK5_U"
+};
 
 // CAUTION: MAX_BANDS * VTX_MAX_CHANNELS <= 256 (1 byte), otherwise libraries/AP_RCTelemetry/AP_CRSF_Telem.cpp, update_vtx_params()
 // and other functions should be updated
+// ATTENTION: Must be synced with the enums: VideoBand, band_names
 static_assert(AP_VideoTX::MAX_BANDS * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
 {
-    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o */
-    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x */
-    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E */
-    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F */
+    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o; AKK5 O */
+    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x; AKK5 H */
+    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E; AKK5 T */
+    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F; AKK5 n */
     { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* 4 Race, R */
-    { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L */
-    // { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 LO Race, L */
-    { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
-    { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
-    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b */
+    { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L; AKK5 b */
+    // { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 Ardupilot's original LO Race, L */
+    { 5129, 5159, 5189, 5219, 5249, 5279, 5309, 5339}, /* 6 AKK5 F */
+    // { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
+    { 4900, 4940, 4921, 4958, 4995, 5032, 5069, 5099}, /* 7 AKK5 L */
+    // { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
+    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b; AKK5 r */
     { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* 9 Band 3G3_A */
     { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
-    // Custom Bnds
+    // Custom Bands
     { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* B Band P, H */
-    { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK */
-    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U */
-    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O */
-    // { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F Band S */
+    { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK, L of Fox10; AKK5 P */
+    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U; AKK5 E */
+    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O; AKK5 A */
+    // { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F D1 Band S */
+    // { 5960, 5980, 6000, 6020, 6030, 6040, 6050, 6060}, /* F AKK5 U */
     { 6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
 };
 
@@ -175,21 +257,30 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     // level, mw, dbm, dac
     { 0xFF, 0,    0, 0    }, // only in SA 2.1
-    { 0,    25,   14, 7    }, // D1
+    { 0,    25,   14, 7    }, // D1; AKK5
     { 0x11, 100,  20, 0xFF }, // only in SA 2.1
-    { 1,    200,  23, 16   },
+    { 1,    200,  23, 16   }, // AKK5
     { 0x12, 400,  26, 0xFF }, // only in SA 2.1
-    { 2,    500,  27, 25   }, // D1
-    { 0x12, 600,  28, 0xFF }, // Tramp lies above power levels and always returns 25/100/200/400/600
+    { 2,    500,  27, 25   }, // D1; AKK5; Fxr10
+    { 0x12, 600,  28, 0xFF },
     { 3,    800,  29, 40   },
-    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1
-    { 0x1A, 1200, 31, 0xFF },
-    { 0x21, 1600, 32, 0xFF }, // only in SA 2.1
-    { 0x22, 2000, 33, 0xFF }, // only in SA 2.1
-    { 0x23, 2500, 34, 0xFF }, // only in SA 2.1; D1
-    { 0x24, 3000, 35, 0xFF }, // only in SA 2.1
+    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1; AKK5
+    { 0x14, 1200, 31, 0xFF },
+    { 0x15, 1600, 32, 0xFF },
+    { 0x16, 2000, 33, 0xFF },
+    { 0x17, 2500, 34, 0xFF }, // D1; Fxr10
+    { 0x18, 3000, 35, 0xFF }, // AKK 3W TX3000ac; AKK5
+    { 0x19, 5000, 37, 0xFF }, // AKK5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
+    { 0x1A, 7500, 39, 0xFF }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
+    { 0x1B, 10000, 40, 0xFF }, // Foxeer 4.9G~6G Reaper Infinity 10W
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
+
+// D1 => _num_active_levels = 4:  25, 500, 1000, 2500; _max_power_mw = 2500
+// FXR10 => _num_active_levels = 5 (6):  500, 2500, 5000, 7500, 10000; _max_power_mw = 10000
+// AKK5 => _num_active_levels = 6:  25, 200, 500, 1000, 3000, 5000; _max_power_mw = 5000
+
+// dBm by mW: \(P_{dBm}=10\log _{10}(\frac{P}{1mW})\)
 
 // AKK power levels
 // 25/250/500/1000/2000/3000mW
@@ -221,24 +312,6 @@ AP_VideoTX::AP_VideoTX()
     singleton = this;
 
     AP_Param::setup_object_defaults(this, var_info);
-
-    // Correct static tables to match object parameters
-    // Make inactive power levels exceeding the power capacity of the target VTX
-    switch (model()) {
-    case Model::D1: {
-        constexpr uint16_t  d1PwrMwMax = 2500;
-        for(uint8_t  i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
-            if(_power_levels[i].active != PowerActive::Inactive) {
-                if(_power_levels[i].mw > d1PwrMwMax)
-                    _power_levels[i].active = PowerActive::Inactive;
-                else break;
-            }
-        }
-        break;
-    }
-    default:
-        break;
-    }
 }
 
 AP_VideoTX::~AP_VideoTX(void)
@@ -248,27 +321,76 @@ AP_VideoTX::~AP_VideoTX(void)
 
 bool AP_VideoTX::init(void)
 {
-    if (_initialized) {
+    if (_initialized)
         return false;
-    }
 
     // PARAMETER_CONVERSION - Added: Sept-2022
     _options.convert_parameter_width(AP_PARAM_INT16);
 
-    // find the index into the power table
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (_power_mw <= _power_levels[i].mw) {
-            if (_power_mw != _power_levels[i].mw) {
-                if (i > 0) {
-                    _current_power = i - 1;
-                }
-                _power_mw.set_and_save(get_power_mw());
-            } else {
-                _current_power = i;
+    // Correct static tables to match object parameters
+    if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
+        _num_active_levels.set_and_save(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
+
+    // Make inactive power levels exceeding the power capacity of the target VTX
+    switch (model()) {
+    case Model::D1: {
+        _max_power_mw.set_and_save(2500);
+        // Initialize and validate power levels
+        const uint16_t  mws[] = {25, 500, 1000, 2500};
+        _num_active_levels.set_and_save(sizeof mws / sizeof(*mws));
+        uint8_t j = 0;
+        for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_POWER_LEVELS; ++i) {
+            if(j >= _num_active_levels || _power_levels[i].mw < mws[j])
+                _power_levels[i].active = PowerActive::Inactive;
+            else if(_power_levels[i].mw >= mws[j]) {
+                if(_power_levels[i].mw > mws[j])
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mws[j]);
+                ++j;
             }
-            break;
+        }
+        break;
+    }
+    case Model::FXR10: {
+        _max_power_mw.set_and_save(10000);
+        std::initializer_list<PowerValue> pws = {
+            // value, mW
+            {25, 500},
+            {100, 2500},
+            {200, 5000},
+            {400, 7500},
+            {600, 10000}
+        };
+        std::copy(pws.begin(), pws.end(), _power_vals);
+        _num_active_levels.set_and_save(5);  // ATTENTION: must be synced with the actual values of _power_vals
+        validate_cpowlevs();
+        break;
+    }
+    case Model::CUSTOM:
+        for(uint8_t i = 0; i < _num_active_levels; ++i) {
+            _power_vals[i].val = _cvals[i];
+            _power_vals[i].mw = _cmws[i];
+        }
+        validate_cpowlevs();
+        break;
+    default:
+        // Consider _max_power_mw
+        for(uint8_t  i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
+            if(_power_levels[i].active != PowerActive::Inactive) {
+                if(_power_levels[i].mw > _max_power_mw)
+                    _power_levels[i].active = PowerActive::Inactive;
+                else break;
+            }
         }
     }
+
+    // Find the index into the power table
+    _current_power = 0;
+    while(_current_power < VTX_MAX_POWER_LEVELS && _power_mw > _power_levels[_current_power].mw)
+        ++_current_power;
+    if(_current_power && _power_mw < _power_levels[_current_power].mw)
+        --_current_power;
+    _power_mw.set_and_save(get_power_mw());
+
     _current_band = _band;
     _current_channel = _channel;
     _current_frequency = _frequency_mhz;
@@ -301,10 +423,12 @@ void AP_VideoTX::set_configured_power_mw(uint16_t power)
 
 uint8_t AP_VideoTX::find_current_power() const
 {
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (_power_mw == _power_levels[i].mw) {
+    if(_current_power < VTX_MAX_POWER_LEVELS && _power_mw == _power_levels[_current_power].mw)
+        return _current_power;
+
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; ++i) {
+        if (_power_mw == _power_levels[i].mw)
             return i;
-        }
     }
     return 0;
 }
@@ -346,7 +470,7 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
 // add an active power setting in dbm
 uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active)
 {
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && power <= _power_levels[i].dbm; ++i) {
         if (power == _power_levels[i].dbm) {
             if (_power_levels[i].active != active) {
                 _power_levels[i].active = active;
@@ -382,7 +506,7 @@ void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
 // set the power in mw
 void AP_VideoTX::set_power_mw(uint16_t power)
 {
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && power >= _power_levels[i].mw; i++) {
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && power >= _power_levels[i].mw; ++i) {
         if (power == _power_levels[i].mw) {
             _current_power = i;
             break;
@@ -423,6 +547,56 @@ void AP_VideoTX::set_power_dac(uint16_t power, PowerActive active)
             debug("learned power %dmw", get_power_mw());
         }
     }
+}
+
+// Validate custom power levels by deactivating non-specified once
+void AP_VideoTX::validate_cpowlevs()
+{
+    uint8_t  j = 0;
+    for(uint8_t  i = 0; i < VTX_MAX_POWER_LEVELS; ++i) {
+        if(j >= _num_active_levels || _power_levels[i].mw < _power_vals[j].mw)
+            _power_levels[i].active = PowerActive::Inactive;
+        else if(_power_vals[j].mw == _power_levels[i].mw)
+            ++j;
+    }
+}
+
+// Set power value (custom or predefined)
+void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
+{
+    // Get custom mW by the value, use approximate value if the exact one has not been found
+    auto cmw = [this](uint16_t val) {
+        uint8_t i = 0;
+        for (; i < VTX_MAX_ADJUSTABLE_POWER_LEVELS && _power_vals[i].val <= val; ++i)
+            if (val == _power_vals[i].val)
+                return _power_vals[i].mw;
+        if (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw)
+            --i;
+        return _power_vals[i].mw;
+    };
+
+    if (cmw(power) == _power_levels[_current_power].mw
+    && _power_levels[_current_power].active == active)
+        return;
+
+    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_ADJUSTABLE_POWER_LEVELS; ++i) {
+        if (_power_levels[i].mw == _power_vals[j].mw) {
+            if (power == _power_vals[j].val) {
+                _current_power = i;
+                _power_levels[i].active = active;
+                debug("learned power %dmw", get_power_mw());
+                break;
+            } else ++j;
+        }
+    }
+}
+
+uint16_t AP_VideoTX::get_configured_power_val() const
+{
+     for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && _power_vals[i].mw <= _power_mw; ++i)
+        if(_power_vals[i].mw == _power_mw)
+            return _power_vals[i].val;
+    return 0;
 }
 
 // set the current channel
@@ -626,9 +800,9 @@ void AP_VideoTX::announce_vtx_settings() const
 // 6-pos range is in the middle of the available range
 void AP_VideoTX::change_power(int8_t position)
 {
-    if (!_enabled || position < 0 || position > 5) {
+    if (!_enabled || position < 0 || position >= _num_active_levels)
         return;
-    }
+
     // first find out how many possible levels there are
     uint8_t num_active_levels = 0;
     for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
@@ -637,12 +811,12 @@ void AP_VideoTX::change_power(int8_t position)
         }
     }
     // iterate through to find the level
-    uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1)/ 6.0f) - 1), 0, num_active_levels - 1);
+    uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / float(_num_active_levels)) - 1), 0, num_active_levels - 1);
     debug("looking for pos %d power level %d from %d", position, level, num_active_levels);
     uint16_t power = 0;
-    for (uint8_t i = 0, j = 0; i < num_active_levels; i++, j++) {
+    for (uint8_t i = 0, j = 0; i < num_active_levels; ++i, ++j) {
         while (j < VTX_MAX_POWER_LEVELS-1 && _power_levels[j].active == PowerActive::Inactive) {
-            j++;
+            ++j;
         }
         if (i == level) {
             power = _power_levels[j].mw;
