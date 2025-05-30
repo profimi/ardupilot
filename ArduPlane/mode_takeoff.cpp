@@ -75,7 +75,11 @@ void ModeTakeoff::update()
         plane.calc_nav_roll();
         plane.calc_nav_pitch();
         SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
-        return;
+        // Skip this check in the unsafe takeoff mode
+        if (!plane.g2.takeoff_unsafe) {
+            gcs().send_text(MAV_SEVERITY_INFO, "Terminating the safe takeoff, given the absent location");
+            return;
+        }
     }
 
     const float alt = target_alt;

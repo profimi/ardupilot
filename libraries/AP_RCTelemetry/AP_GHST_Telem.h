@@ -64,10 +64,11 @@ public:
 #error "Only supported on little-endian architectures"
 #endif
         uint8_t flags;
-        uint16_t frequency;         // frequency in Mhz
-        uint16_t power;              // power in mw, 0 == off
-        uint8_t band : 4;               // A, B, E, AirWave, Race
-        uint8_t channel : 4;            // 1x-8x
+        uint16_t frequency; // frequency in Mhz
+        uint16_t power; // power in mw, 0 == off
+        // CAUTION: the original bit fields are: band: 4, channel: 4
+        uint8_t band : 5; // 4 bits originally; A, B, E, AirWave, Race; see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp
+        uint8_t channel : 3; // 4 bits originally; 1x-8x
         uint8_t spare[3];
     };
 

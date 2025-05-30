@@ -20,18 +20,28 @@
 
 #include <AP_Param/AP_Param.h>
 
-#define VTX_MAX_CHANNELS 8
-#define VTX_MAX_POWER_LEVELS 10
+constexpr uint8_t VTX_MAX_CHANNELS = 8;
+constexpr uint8_t VTX_MAX_POWER_LEVELS = 18;
+constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7
 
 class AP_VideoTX {
 public:
     AP_VideoTX();
     ~AP_VideoTX();
 
+    // VTX Model
+    enum class Model: uint8_t {
+        GENERIC = 0,
+        D1 = 1,  // D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1
+        FXR10 = 2,  // Foxeer 4.9G~6G Reaper Infinity 10W 80CH VTx; accepts old IRC Tramp mW values for another actual power levels: 25 -> 500mw, 100 -> 2.5W, 200 -> 5W, 400 -> 7.5W, 600 -> 10W
+        // AKK5 = 3,  // Accepts IRC Tramp values in levels: 0 .. 4; AKK Ultra Long Range 5W: 25/200/500/1000/3000/5000mW
+        CUSTOM = 9  // 6 custom power values
+    };
+
     /* Do not allow copies */
     CLASS_NO_COPY(AP_VideoTX);
 
-    // init - perform required initialisation
+    // Perform required initialisation because param.set_and_save() can't be used in the constructor
     bool init();
 
     // run any required updates
@@ -57,17 +67,35 @@ public:
 
     enum VideoBand {
         BAND_A,
+        BAND_o = BAND_A,
         BAND_B,
+        BAND_x = BAND_B,
         BAND_E,
-        FATSHARK,
+        FATSHARK,  // Airwave
+        BAND_F = FATSHARK,
         RACEBAND,
+        BAND_R = RACEBAND,
         LOW_RACEBAND,
-        BAND_1G3_A,
-        BAND_1G3_B,
+        BAND_L = LOW_RACEBAND,
+        // BAND_1G3_A,
+        BAND_AKK5_F,
+        // BAND_1G3_B,
+        BAND_AKK5_L,
         BAND_X,
+        BAND_b = BAND_X,
         BAND_3G3_A,
         BAND_3G3_B,
+        // Custom bands
+        BAND_P,
+        BAND_H = BAND_P,
+        BAND_l,
+        BAND_U,
+        BAND_O,
+        // BAND_D1_S, BAND_AKK5_U
+        BAND_C,
         MAX_BANDS
+        // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp have been
+        // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
     };
 
     enum class PowerActive {
@@ -90,7 +118,13 @@ public:
         PowerActive active;
     };
 
+    struct PowerValue {
+        uint16_t val;  // VTX value
+        uint16_t mw;  // Actual power in mW
+    };
+
     static PowerLevel _power_levels[VTX_MAX_POWER_LEVELS];
+    PowerValue _power_vals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];  // Custom or specialized power values if necessary
 
     static const uint16_t VIDEO_CHANNELS[MAX_BANDS][VTX_MAX_CHANNELS];
 
@@ -112,6 +146,12 @@ public:
     uint8_t update_power_dbm(uint8_t power, PowerActive active=PowerActive::Active);
     void update_all_power_dbm(uint8_t nlevels, const uint8_t levels[]);
     void set_configured_power_mw(uint16_t power);
+
+    // Handle custom power value tables
+    void validate_cpowlevs();
+    void set_power_val(uint16_t power, PowerActive active=PowerActive::Active);
+    uint16_t get_configured_power_val() const;
+
     uint16_t get_configured_power_mw() const { return _power_mw; }
     uint16_t get_power_mw() const { return _power_levels[_current_power].mw; }
 
@@ -131,15 +171,18 @@ public:
     bool update_power() const;
     // change the video power based on switch input
     void change_power(int8_t position);
+    // Validate band and channel
+    bool band_valid(uint8_t band) const;
+    bool channel_valid(uint8_t channel) const;
     // get / set the frequency band
-    void set_band(uint8_t band) { _current_band = band; }
-    void set_configured_band(uint8_t band) { _band.set_and_save_ifchanged(band); }
+    void set_band(uint8_t band) { if(band_valid(band)) _current_band = band; }
+    void set_configured_band(uint8_t band) { if(band_valid(band)) _band.set_and_save_ifchanged(band); }
     uint8_t get_configured_band() const { return _band; }
     uint8_t get_band() const { return _current_band; }
     bool update_band() const { return _defaults_set && _band != _current_band; }
     // get / set the frequency channel
-    void set_channel(uint8_t channel) { _current_channel = channel; }
-    void set_configured_channel(uint8_t channel) { _channel.set_and_save_ifchanged(channel); }
+    void set_channel(uint8_t channel) { if(channel_valid(channel)) _current_channel = channel; }
+    void set_configured_channel(uint8_t channel) { if(channel_valid(channel)) _channel.set_and_save_ifchanged(channel); }
     uint8_t get_configured_channel() const { return _channel; }
     uint8_t get_channel() const { return _current_channel; }
     bool update_channel() const { return _defaults_set && _channel != _current_channel; }
@@ -157,6 +200,9 @@ public:
     void set_enabled(bool enabled);
     bool get_enabled() const { return _enabled; }
     bool update_enabled() const { return _defaults_set && _enabled != _current_enabled; }
+
+    void set_preset(uint8_t preset_no);
+    Model model() const  { return static_cast<Model>(static_cast<uint8_t>(_model)); }
 
     // have the parameters been updated
     bool have_params_changed() const;
@@ -203,6 +249,19 @@ private:
 
     AP_Int8 _enabled;
     bool _current_enabled;
+
+    // Preset block:  BBC (band 0..15 and channel 0..7)
+    AP_Int16  _preset[6];
+
+    // VTX model
+    AP_Int8  _model;
+
+    // The number of active power levels of VTX
+    AP_Int8 _num_active_levels;
+
+    // Custom VTX values and labels (mW)
+    AP_Int16 _cvals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];
+    AP_Int16 _cmws[VTX_MAX_ADJUSTABLE_POWER_LEVELS];
 
     bool _initialized;
     // when defaults have been configured

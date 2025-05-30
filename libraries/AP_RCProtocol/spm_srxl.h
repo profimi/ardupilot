@@ -149,16 +149,16 @@ typedef enum
     SRXL_CMD_BIND_INFO,
 } SRXL_CMD;
 
-// VTX Band
-#define VTX_BAND_FATSHARK   (0)
-#define VTX_BAND_RACEBAND   (1)
-#define VTX_BAND_E_BAND     (2)
-#define VTX_BAND_B_BAND     (3)
-#define VTX_BAND_A_BAND     (4)
-
-// VTX Pit Mode
-#define VTX_MODE_RACE   (0)
-#define VTX_MODE_PIT    (1)
+// // VTX Band (see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp)
+// #define VTX_BAND_FATSHARK   (0)
+// #define VTX_BAND_RACEBAND   (1)
+// #define VTX_BAND_E_BAND     (2)
+// #define VTX_BAND_B_BAND     (3)
+// #define VTX_BAND_A_BAND     (4)
+//
+// // VTX Pit Mode
+// #define VTX_MODE_RACE   (0)
+// #define VTX_MODE_PIT    (1)
 
 // VTX Power
 #define VTX_POWER_OFF           (0)

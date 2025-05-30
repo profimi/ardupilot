@@ -265,6 +265,10 @@ public:
         AUTOLAND =           183,  //Fixed Wing AUTOLAND Mode
         SYSTEMID =           184,  // system ID as an aux switch
 
+        VTX_PRESET =         197, // VTX preset change function
+        VTX_BAND =           198, // VTX band change function
+        VTX_CHANNEL =        199, // VTX channel change function
+
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
         PITCH =              202, // pitch input
@@ -286,6 +290,10 @@ public:
 
         // inputs 248-249 are reserved for the Skybrush fork at
         // https://github.com/skybrush-io/ardupilot
+
+        // Custom AUX functions
+        FBWB =                250, // Fly-By-Wire-B
+        FBWC =                251, // Fly-By-Wire-C
 
         // inputs for the use of onboard lua scripting
         SCRIPTING_1 =        300,

@@ -463,13 +463,13 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
             update_vtx_params();
             break;
 #endif
-        case BATTERY: // BATTERY
+        case BATTERY:
             calc_battery();
             break;
-        case GPS: // GPS
+        case GPS:
             calc_gps();
             break;
-        case FLIGHT_MODE: // GPS
+        case FLIGHT_MODE:
             calc_flight_mode();
             break;
         case PASSTHROUGH:
@@ -637,7 +637,7 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
     AP_VideoTX::VideoBand band;
     uint8_t channel;
     if (AP_VideoTX::get_band_and_channel(vtx->frequency, band, channel)) {
-        apvtx.set_band(uint8_t(band));
+        apvtx.set_band(static_cast<uint8_t>(band));
         apvtx.set_channel(channel);
     }
 
@@ -850,11 +850,18 @@ void AP_CRSF_Telem::update_vtx_params()
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_FREQ;
             _telem.ext.command.payload[1] = (vtx.get_frequency_mhz() & 0xFF00) >> 8;
             _telem.ext.command.payload[2] = (vtx.get_frequency_mhz() & 0xFF);
+            ++len;
             _vtx_freq_update = false;
-            len++;
         } else if (_vtx_freq_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_CHANNEL;
             _telem.ext.command.payload[1] = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+
+            // // Note: 2 byte abs channel is required for > 32 bands with 8 channels
+            // const uint16_t  chan = static_cast<uint16_t>(vtx.get_configured_band()) * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            // _telem.ext.command.payload[1] = chan >> 8;
+            // _telem.ext.command.payload[2] = chan & 0xFF;
+            // ++len;
+
             _vtx_freq_update = true;
         } else if (_vtx_power_change_pending && _vtx_dbm_update) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER_DBM;

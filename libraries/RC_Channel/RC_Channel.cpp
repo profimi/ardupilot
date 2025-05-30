@@ -249,6 +249,9 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter}: 182: AHRS AutoTrim
     // @Values{Plane}: 183: AUTOLAND mode
     // @Values{Plane}: 184: System ID Chirp (Quadplane only)
+    // @Values{Copter, Rover, Plane}: 197:VTX Preset
+    // @Values{Copter, Rover, Plane}: 198:VTX Band
+    // @Values{Copter, Rover, Plane}: 199:VTX Channel
     // @Values{Rover}: 201:Roll
     // @Values{Rover}: 202:Pitch
     // @Values{Rover}: 207:MainSail
@@ -259,6 +262,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter, Rover, Plane, Sub}: 212:Mount1 Roll, 213:Mount1 Pitch, 214:Mount1 Yaw, 215:Mount2 Roll, 216:Mount2 Pitch, 217:Mount2 Yaw
     // @Values{Copter, Rover, Plane, Blimp, Sub}:  218:Loweheiser throttle
     // @Values{Copter}: 219:Transmitter Tuning
+    // @Values{Plane}: 250:FBWB, 251:FBWC
     // @Values{Copter, Rover, Plane, Sub}: 300:Scripting1, 301:Scripting2, 302:Scripting3, 303:Scripting4, 304:Scripting5, 305:Scripting6, 306:Scripting7, 307:Scripting8, 308:Scripting9, 309:Scripting10, 310:Scripting11, 311:Scripting12, 312:Scripting13, 313:Scripting14, 314:Scripting15, 315:Scripting16
     // @User: Standard
     AP_GROUPINFO("OPTION",  6, RC_Channel, option, 0),
@@ -573,15 +577,19 @@ bool RC_Channel::read_6pos_switch(int8_t& position)
         return false;  // This is an error condition
     }
 
-    if (pulsewidth < 1231) {
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    if (pulsewidth < 1090) {
         position = 0;
-    } else if (pulsewidth < 1361) {
+    } else if (pulsewidth < 1294) {
         position = 1;
-    } else if (pulsewidth < 1491) {
+    } else if (pulsewidth < 1499) {
         position = 2;
-    } else if (pulsewidth < 1621) {
+    } else if (pulsewidth < 1704) {
         position = 3;
-    } else if (pulsewidth < 1750) {
+    } else if (pulsewidth < 1909) {
         position = 4;
     } else {
         position = 5;
@@ -703,6 +711,9 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
 #if AP_VIDEOTX_ENABLED
     case AUX_FUNC::VTX_POWER:
+    case AUX_FUNC::VTX_PRESET:
+    case AUX_FUNC::VTX_BAND:
+    case AUX_FUNC::VTX_CHANNEL:
 #endif
 #if AP_OPTICALFLOW_CALIBRATOR_ENABLED
     case AUX_FUNC::OPTFLOW_CAL:
@@ -951,7 +962,38 @@ bool RC_Channel::read_aux()
     } else if (_option == AUX_FUNC::VTX_POWER) {
         int8_t position;
         if (read_6pos_switch(position)) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "Power switch position: %u\n", position);
             AP::vtx().change_power(position);
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_CHANNEL) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_channel(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_BAND) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_band(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_PRESET) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_preset(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
             return true;
         }
         return false;

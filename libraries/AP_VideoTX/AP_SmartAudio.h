@@ -235,7 +235,7 @@ private:
     void set_operation_mode(uint8_t mode);
     // change the frequency
     void set_frequency(uint16_t frequency, bool isPitModeFreq);
-    // change the channel
+    // change the channel that already includes its band
     void set_channel(uint8_t chan);
     // get the pitmode frequency
     void request_pit_mode_frequency();

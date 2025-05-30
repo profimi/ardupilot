@@ -104,7 +104,8 @@ bool Plane::suppress_throttle(void)
         return false;
     }
 
-    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
+    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5)
+        || g2.takeoff_unsafe;  // For unsafe takeoff we consider vehicle as moving vehicle
     
     if ((control_mode == &mode_auto &&
          auto_state.takeoff_complete == false) ||
@@ -132,8 +133,8 @@ bool Plane::suppress_throttle(void)
         return true;
     }
     
-    if (fabsf(relative_altitude) >= 10.0f) {
-        // we're more than 10m from the home altitude
+    if (fabsf(relative_altitude) >= g2.throttle_alt_min) {
+        // we're more than throttle_alt_min from the home altitude
         throttle_suppressed = false;
         return false;
     }

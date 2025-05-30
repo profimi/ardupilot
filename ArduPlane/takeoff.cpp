@@ -27,14 +27,15 @@ bool Plane::auto_takeoff_check(void)
     bool takeoff_dir_initialized = takeoff_state.initial_direction.initialized;
     float takeoff_dir = takeoff_state.initial_direction.heading;
 #endif
-     if (takeoff_state.last_check_ms && (now - takeoff_state.last_check_ms) > 200) {
-         memset(&takeoff_state, 0, sizeof(takeoff_state));
+    if (takeoff_state.last_check_ms && (now - takeoff_state.last_check_ms) > 200) {
+        memset(&takeoff_state, 0, sizeof(takeoff_state));
 #if MODE_AUTOLAND_ENABLED
-         takeoff_state.initial_direction.initialized = takeoff_dir_initialized; //restore dir init state
-         takeoff_state.initial_direction.heading = takeoff_dir;
+        takeoff_state.initial_direction.initialized = takeoff_dir_initialized; //restore dir init state
+        takeoff_state.initial_direction.heading = takeoff_dir;
 #endif
-         return false;
-     }
+        gcs().send_text(MAV_SEVERITY_DEBUG, "Takeoff direction is updated");
+        return false;
+    }
     takeoff_state.last_check_ms = now;
     
     //check if waiting for rudder neutral after rudder arm
@@ -55,9 +56,10 @@ bool Plane::auto_takeoff_check(void)
        takeoff_state.waiting_for_rudder_neutral = false;
     }  
 
-    // Check for bad GPS
-    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+     // Check for bad GPS only for safe takeoff
+    if (gps.status() < AP_GPS::GPS_OK_FIX_3D && !g2.takeoff_unsafe) {
         // no auto takeoff without GPS lock
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Safe takeoff is cancelled, given the absense of GPS");
         return false;
     }
 
@@ -72,6 +74,8 @@ bool Plane::auto_takeoff_check(void)
         float xaccel = TECS_controller.get_VXdot();
         if (g2.takeoff_throttle_accel_count <= 1) {
             if (xaccel < g.takeoff_throttle_min_accel) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Takeoff launch is cancelled because of the low xaccel: %f (< %f)",
+                    xaccel, static_cast<float>(g.takeoff_throttle_min_accel));
                 goto no_launch;
             }
         } else {
@@ -86,6 +90,8 @@ bool Plane::auto_takeoff_check(void)
                 takeoff_state.accel_event_ms = now;
             }
             if (takeoff_state.accel_event_counter < g2.takeoff_throttle_accel_count) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Takeoff launch is cancelled because of the insufficient number of the throttle acceleration events: %u (< %u)",
+                    takeoff_state.accel_event_counter, static_cast<uint8_t>(g2.takeoff_throttle_accel_count));
                 goto no_launch;
             }
         }
@@ -121,9 +127,10 @@ bool Plane::auto_takeoff_check(void)
         }
     }
 
-    // Check ground speed and time delay
-    if (((gps.ground_speed() > g.takeoff_throttle_min_speed || is_zero(g.takeoff_throttle_min_speed))) &&
-        ((now - takeoff_state.last_tkoff_arm_time) >= wait_time_ms)) {
+    // Check ground speed and time delay. It is necessary to have show some gps speeed for unsafe takeoff
+    if (((gps.ground_speed() + (g2.takeoff_unsafe ? 0.1f : 0.f) > g.takeoff_throttle_min_speed)
+        || is_zero(g.takeoff_throttle_min_speed))
+        && ((now - takeoff_state.last_tkoff_arm_time) >= wait_time_ms)) {
         gcs().send_text(MAV_SEVERITY_INFO, "Triggered AUTO. GPS speed = %.1f", (double)gps.ground_speed());
         takeoff_state.launchTimerStarted = false;
         takeoff_state.last_tkoff_arm_time = 0;
@@ -134,6 +141,7 @@ bool Plane::auto_takeoff_check(void)
         return true;
     }
 
+    gcs().send_text(MAV_SEVERITY_INFO, "Takeoff launch has been cancelled");
     // we're not launching yet, but the timer is still going
     return false;
 
@@ -294,6 +302,8 @@ void Plane::takeoff_calc_throttle() {
         takeoff_state.throttle_lim_min = takeoff_state.throttle_lim_max;
     }
 
+    // Caculate required throttle using TECS (Total Energy Control System) for Speed and Height.
+    // Calibrate the airspeed sensor. Tune the Pitch to Servo Loop. Set initial parameters — throttle, pitch, airspeed and vertical speed limits.
     calc_throttle();
 }
 
