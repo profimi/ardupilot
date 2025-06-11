@@ -604,6 +604,7 @@ public:
 
 #if PLD_ARMING_ENABLED
     AP_Int8 pld_relay;
+    AP_Int8 pld_rcin;
     AP_Int16 pld_timeout;
 #endif
 

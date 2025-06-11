@@ -2571,33 +2571,70 @@ void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
 #if PLD_ARMING_ENABLED
 void AP_OSD_Screen::draw_pld_arm(uint8_t x, uint8_t y)
 {
-    AP_Relay *relay = AP_Relay::get_singleton();
     static auto arm_start_time = 0;
     static bool pld_armed = false;
 
-    if (relay == nullptr) {
-       return;
-    }
-    if (relay->get(osd->pld_relay)) {
-        if (pld_armed)
-        {
-            backend->write(x, y, false, "P ARMED");
+    if(osd->pld_relay) {
+        AP_Relay *relay = AP_Relay::get_singleton();
+        if (relay == nullptr)
             return;
-        }
-        if(arm_start_time == 0) { arm_start_time = AP_HAL::millis(); }
+        if (relay->get(osd->pld_relay)) {
+            if (pld_armed)
+            {
+                backend->write(x, y, false, "P ARMED");
+                return;
+            }
+            if(arm_start_time == 0) { arm_start_time = AP_HAL::millis(); }
 
-        auto time_deltha = AP_HAL::millis() - arm_start_time;
-        auto timeout = osd->pld_timeout * 1000;
-        if (time_deltha < timeout)
-        {
-            backend->write(x, y, false, "P ARM IN %02lu", (timeout - time_deltha) / 1000);
-            return;
+            const auto time_deltha = AP_HAL::millis() - arm_start_time;
+            const auto timeout = osd->pld_timeout * 1000;
+            if (time_deltha < timeout)
+            {
+                backend->write(x, y, false, "P ARM IN %02lu", (timeout - time_deltha) / 1000);
+                return;
+            }
+            pld_armed = true;
+        } else {
+            backend->write(x, y, false, "P DISARM");
+            pld_armed = false;
+            arm_start_time = 0;
         }
-        pld_armed = true;
-    } else {
-        backend->write(x, y, false, "P DISARM");
-        pld_armed = false;
-        arm_start_time = 0;
+    } else if(osd->pld_rcin) {
+        // pld_rcin
+        const uint16_t  pwm = hal.rcin->read(osd->pld_rcin-1);
+        // backend->write(x, y, false /* blink */, "PWM: %u", pwm);
+        if(pwm < 1300) {
+            backend->write(x, y, false, "P DISARM");
+            pld_armed = false;
+            arm_start_time = 0;
+        } else {
+            if (pld_armed) {
+                backend->write(x, y, false, "P ARMED");
+                return;
+            }
+
+            if (pwm < 1800) {
+                // Arming
+                if(arm_start_time == 0)
+                    arm_start_time = AP_HAL::millis();
+
+                const auto time_deltha = AP_HAL::millis() - arm_start_time;
+                const auto timeout = osd->pld_timeout * 1000;
+                if (time_deltha < timeout)
+                {
+                    backend->write(x, y, false, "P ARM IN %02lu", (timeout - time_deltha) / 1000);
+                    return;
+                }
+                pld_armed = true;
+            } else {
+                // Initialization (explosion)
+                pld_armed = false;
+                arm_start_time = 0;
+                if(pld_armed)
+                    backend->write(x, y, false, "P INITED");
+                else backend->write(x, y, true /* blink */, "P NOT INITED (arm first)");
+            }
+        }
     }
 }
 #endif
