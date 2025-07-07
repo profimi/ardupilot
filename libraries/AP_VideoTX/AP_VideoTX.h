@@ -15,14 +15,15 @@
 #pragma once
 
 #include "AP_VideoTX_config.h"
+#include <array>
 
 #if AP_VIDEOTX_ENABLED
 
 #include <AP_Param/AP_Param.h>
 
 constexpr uint8_t VTX_MAX_CHANNELS = 8;
-constexpr uint8_t VTX_MAX_POWER_LEVELS = 18;
-constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7
+constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7, typically 5-6
+extern const uint8_t VTX_MAX_POWER_LEVELS;  // = 19;
 
 class AP_VideoTX {
 public:
@@ -35,6 +36,7 @@ public:
         D1 = 1,  // D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1
         FXR10 = 2,  // Foxeer 4.9G~6G Reaper Infinity 10W 80CH VTx; accepts old IRC Tramp mW values for another actual power levels: 25 -> 500mw, 100 -> 2.5W, 200 -> 5W, 400 -> 7.5W, 600 -> 10W
         // AKK5 = 3,  // Accepts IRC Tramp values in levels: 0 .. 4; AKK Ultra Long Range 5W: 25/200/500/1000/3000/5000mW
+        // AKK8 = 3,  // AKK TX8000AC Ultra Long Range 8W: 20/1000/3000/5000/8000 mW
         CUSTOM = 9  // 6 custom power values
     };
 
@@ -123,7 +125,9 @@ public:
         uint16_t mw;  // Actual power in mW
     };
 
-    static PowerLevel _power_levels[VTX_MAX_POWER_LEVELS];
+    // Mapping of power level to milli watt to dbm
+    static PowerLevel _power_levels[];  // VTX_MAX_POWER_LEVELS items
+
     PowerValue _power_vals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];  // Custom or specialized power values if necessary
 
     static const uint16_t VIDEO_CHANNELS[MAX_BANDS][VTX_MAX_CHANNELS];

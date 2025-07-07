@@ -224,37 +224,38 @@ const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L",
 static_assert(AP_VideoTX::MAX_BANDS * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
 {
-    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o; AKK5 O */
-    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x; AKK5 H */
-    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E; AKK5 T */
-    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F; AKK5 n */
+    { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o; AKK O */
+    { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x; AKK H */
+    { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E; AKK T */
+    { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK, F; AKK n */
     { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* 4 Race, R */
-    { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L; AKK5 b */
+    { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L; AKK b */
     // { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 Ardupilot's original LO Race, L */
-    { 5129, 5159, 5189, 5219, 5249, 5279, 5309, 5339}, /* 6 AKK5 F */
+    { 5129, 5159, 5189, 5219, 5249, 5279, 5309, 5339}, /* 6 AKK F */
     // { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
-    { 4900, 4940, 4921, 4958, 4995, 5032, 5069, 5099}, /* 7 AKK5 L */
+    { 4900, 4940, 4921, 4958, 4995, 5032, 5069, 5099}, /* 7 AKK L */
     // { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
-    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b; AKK5 r */
+    { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b; AKK r */
     { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* 9 Band 3G3_A */
-    { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
-    // Custom Bands
+    { 5960, 5980, 6000, 6020, 6030, 6040, 6050, 6060}, /* A AKK U */
+    // { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
+    // Custom and additional bands
     { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* B Band P, H */
-    { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK, L of Fox10; AKK5 P */
-    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U; AKK5 E */
-    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O; AKK5 A */
+    { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK, L of Fox10; AKK P */
+    { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U; AKK E */
+    { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O; AKK A */
     // { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F D1 Band S */
-    // { 5960, 5980, 6000, 6020, 6030, 6040, 6050, 6060}, /* F AKK5 U */
     { 6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
 };
 
-// mapping of power level to milliwatt to dbm
+// Mapping of power level to milli watt to dbm
 // valid power levels from SmartAudio spec, the adjacent levels might be the actual values
 // so these are marked as level + 0x10 and will be switched if a dbm message proves it
 // Ascedenting ordering of this table by the power in mw is essential
 // D1 Note: power switching works for SamertAudio and fails for the original IRC Tramp that uses power_mw value,
 // where D1 requires power_dbm value
-AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
+// AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
+AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
     { 0xFF, 0,    0, 0    }, // only in SA 2.1
     { 0,    25,   14, 7    }, // D1; AKK5
@@ -264,17 +265,20 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
     { 2,    500,  27, 25   }, // D1; AKK5; Fxr10
     { 0x12, 600,  28, 0xFF },
     { 3,    800,  29, 40   },
-    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1; AKK5
+    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1; AKK8/5/3
     { 0x14, 1200, 31, 0xFF },
     { 0x15, 1600, 32, 0xFF },
     { 0x16, 2000, 33, 0xFF },
     { 0x17, 2500, 34, 0xFF }, // D1; Fxr10
-    { 0x18, 3000, 35, 0xFF }, // AKK 3W TX3000ac; AKK5
-    { 0x19, 5000, 37, 0xFF }, // AKK5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
+    { 0x18, 3000, 35, 0xFF }, // AKK8/5/3
+    { 0x19, 5000, 37, 0xFF }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
     { 0x1A, 7500, 39, 0xFF }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
-    { 0x1B, 10000, 40, 0xFF }, // Foxeer 4.9G~6G Reaper Infinity 10W
+    { 0x1B, 8000, 39, 0xFF }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
+    { 0x1C, 10000, 40, 0xFF }, // Foxeer 4.9G~6G Reaper Infinity 10W
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
+
+const uint8_t VTX_MAX_POWER_LEVELS = sizeof(AP_VideoTX::_power_levels) / sizeof(AP_VideoTX::_power_levels[0]);
 
 // D1 => _num_active_levels = 4:  25, 500, 1000, 2500; _max_power_mw = 2500
 // FXR10 => _num_active_levels = 5 (6):  500, 2500, 5000, 7500, 10000; _max_power_mw = 10000
