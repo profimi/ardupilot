@@ -203,7 +203,7 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     AP_GROUPEND
 };
 
-//#define VTX_DEBUG
+// #define VTX_DEBUG
 #ifdef VTX_DEBUG
 # define debug(fmt, args...)	hal.console->printf("VTX: " fmt "\n", ##args)
 #else
@@ -335,25 +335,44 @@ bool AP_VideoTX::init(void)
     if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
         _num_active_levels.set_and_save(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
 
-    // Make inactive power levels exceeding the power capacity of the target VTX
-    switch (model()) {
-    case Model::D1: {
-        _max_power_mw.set_and_save(2500);
-        // Initialize and validate power levels
-        const uint16_t  mws[] = {25, 500, 1000, 2500};
-        _num_active_levels.set_and_save(sizeof mws / sizeof(*mws));
-        uint8_t j = 0;
-        for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_POWER_LEVELS; ++i) {
-            if(j >= _num_active_levels || _power_levels[i].mw < mws[j])
-                _power_levels[i].active = PowerActive::Inactive;
-            else if(_power_levels[i].mw >= mws[j]) {
-                if(_power_levels[i].mw > mws[j])
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mws[j]);
-                ++j;
+    auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws)
+    {
+        _max_power_mw.set_and_save(pwrMax);
+        _num_active_levels.set_and_save(mws.size());
+        uint8_t i = 0;
+        for(auto mw: mws) {
+            for(; i < VTX_MAX_POWER_LEVELS; ++i) {
+                if(_power_levels[i].mw < mw)
+                    _power_levels[i].active = PowerActive::Inactive;
+                else {
+                    if(_power_levels[i].mw == mw)
+                        ++i;
+                    else GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mw);
+                    break;
+                }
             }
         }
+    };
+
+    // Make inactive power levels exceeding the power capacity of the target VTX
+    switch (model()) {
+    case Model::D1:
+        initPowerLevels(2500, {25, 500, 1000, 2500});
+        // _max_power_mw.set_and_save(2500);
+        // // Initialize and validate power levels
+        // const uint16_t  mws[] = {25, 500, 1000, 2500};
+        // _num_active_levels.set_and_save(sizeof mws / sizeof(*mws));
+        // uint8_t j = 0;
+        // for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_POWER_LEVELS; ++i) {
+        //     if(j >= _num_active_levels || _power_levels[i].mw < mws[j])
+        //         _power_levels[i].active = PowerActive::Inactive;
+        //     else if(_power_levels[i].mw >= mws[j]) {
+        //         if(_power_levels[i].mw > mws[j])
+        //             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mws[j]);
+        //         ++j;
+        //     }
+        // }
         break;
-    }
     case Model::FXR10: {
         _max_power_mw.set_and_save(10000);
         std::initializer_list<PowerValue> pws = {
@@ -369,6 +388,9 @@ bool AP_VideoTX::init(void)
         validate_cpowlevs();
         break;
     }
+    case Model::AKK8:
+        initPowerLevels(8000, {25, 1000, 3000, 5000, 8000});
+        break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {
             _power_vals[i].val = _cvals[i];
@@ -819,9 +841,8 @@ void AP_VideoTX::change_power(int8_t position)
     debug("looking for pos %d power level %d from %d", position, level, num_active_levels);
     uint16_t power = 0;
     for (uint8_t i = 0, j = 0; i < num_active_levels; ++i, ++j) {
-        while (j < VTX_MAX_POWER_LEVELS-1 && _power_levels[j].active == PowerActive::Inactive) {
+        while (j < VTX_MAX_POWER_LEVELS-1 && _power_levels[j].active == PowerActive::Inactive)
             ++j;
-        }
         if (i == level) {
             power = _power_levels[j].mw;
             debug("selected power %dmw", power);
@@ -831,7 +852,7 @@ void AP_VideoTX::change_power(int8_t position)
 
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX power to %u mw (#%u)", power, position);
     if (power == 0) {
-        // NOTE: We might want to intentionally tur off VTX to reduce/hide our radio profile unil moving to some further location
+        // NOTE: We might intentionally want to turn off VTX to reduce/hide our radio profile unil moving to some further location
         // if (!hal.util->get_soft_armed())    // don't allow pitmode to be entered if already armed
             set_configured_options(get_configured_options() | uint8_t(VideoOptions::VTX_PITMODE));
     } else {

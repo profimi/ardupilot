@@ -36,7 +36,7 @@ public:
         D1 = 1,  // D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1
         FXR10 = 2,  // Foxeer 4.9G~6G Reaper Infinity 10W 80CH VTx; accepts old IRC Tramp mW values for another actual power levels: 25 -> 500mw, 100 -> 2.5W, 200 -> 5W, 400 -> 7.5W, 600 -> 10W
         // AKK5 = 3,  // Accepts IRC Tramp values in levels: 0 .. 4; AKK Ultra Long Range 5W: 25/200/500/1000/3000/5000mW
-        // AKK8 = 3,  // AKK TX8000AC Ultra Long Range 8W: 20/1000/3000/5000/8000 mW
+        AKK8 = 3,  // AKK TX8000AC Ultra Long Range 8W: 20/1000/3000/5000/8000 mW
         CUSTOM = 9  // 6 custom power values
     };
 
