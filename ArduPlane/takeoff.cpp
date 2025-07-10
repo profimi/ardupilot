@@ -183,7 +183,7 @@ void Plane::takeoff_calc_roll(void)
         const float current_baro_alt = barometer.get_altitude();
 
         takeoff_roll_limit_cd = linear_interpolate(g.level_roll_limit*100, roll_limit_cd,
-                                        current_baro_alt,
+                                        current_baro_alt + lim2*mode_takeoff.ctl_altr,  // Note: addition is required to ensure sufficient maneuverability to withstand crosswinds
                                         auto_state.baro_takeoff_alt+lim1, auto_state.baro_takeoff_alt+lim2);
     }
 

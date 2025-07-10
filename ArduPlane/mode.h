@@ -951,6 +951,8 @@ public:
     AP_Int16 target_alt;
     AP_Int16 level_alt;
     AP_Float ground_pitch;
+    AP_Float ctl_supr;
+    AP_Float ctl_altr;
 
 protected:
     AP_Int16 target_dist;
