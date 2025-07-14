@@ -220,6 +220,7 @@ const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L",
 
 // CAUTION: MAX_BANDS * VTX_MAX_CHANNELS <= 256 (1 byte), otherwise libraries/AP_RCTelemetry/AP_CRSF_Telem.cpp, update_vtx_params()
 // and other functions should be updated
+// Note: SmartAudio v2.0 uses internal bands of a particular VTX unlike IRC Tramp
 // ATTENTION: Must be synced with the enums: VideoBand, band_names
 static_assert(AP_VideoTX::MAX_BANDS * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
 const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
@@ -257,24 +258,24 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 // AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
-    { 0xFF, 0,    0, 0    }, // only in SA 2.1
-    { 0,    25,   14, 7    }, // D1; AKK5
-    { 0x11, 100,  20, 0xFF }, // only in SA 2.1
-    { 1,    200,  23, 16   }, // AKK5
-    { 0x12, 400,  26, 0xFF }, // only in SA 2.1
-    { 2,    500,  27, 25   }, // D1; AKK5; Fxr10
-    { 0x12, 600,  28, 0xFF },
-    { 3,    800,  29, 40   },
-    { 0x13, 1000, 30, 0xFF }, // only in SA 2.1; D1; AKK8/5/3
-    { 0x14, 1200, 31, 0xFF },
-    { 0x15, 1600, 32, 0xFF },
-    { 0x16, 2000, 33, 0xFF },
-    { 0x17, 2500, 34, 0xFF }, // D1; Fxr10
-    { 0x18, 3000, 35, 0xFF }, // AKK8/5/3
-    { 0x19, 5000, 37, 0xFF }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
-    { 0x1A, 7500, 39, 0xFF }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
-    { 0x1B, 8000, 39, 0xFF }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
-    { 0x1C, 10000, 40, 0xFF }, // Foxeer 4.9G~6G Reaper Infinity 10W
+    { 0xFF, 0,    0, 0   }, // only in SA 2.1
+    { 0,    25,   14, 7  }, // D1; AKK5
+    { 0x11, 100,  20, 10 }, // only in SA 2.1
+    { 1,    200,  23, 16 }, // AKK5
+    { 0x12, 400,  26, 20 }, // only in SA 2.1
+    { 2,    500,  27, 25 }, // D1; AKK5; Fxr10
+    { 0x12, 600,  28, 30 },
+    { 3,    800,  29, 40 },
+    { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; AKK8/5/3
+    { 0x14, 1200, 31, 52 },
+    { 0x15, 1600, 32, 56 },
+    { 0x16, 2000, 33, 60 },
+    { 0x17, 2500, 34, 65 }, // D1; Fxr10
+    { 0x18, 3000, 35, 70 }, // AKK8/5/3
+    { 0x19, 5000, 37, 80 }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
+    { 0x1A, 7500, 39, 85 }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
+    { 0x1B, 8000, 39, 90 }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
+    { 0x1C, 10000, 40, 100 }, // Foxeer 4.9G~6G Reaper Infinity 10W
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
 
@@ -358,20 +359,6 @@ bool AP_VideoTX::init(void)
     switch (model()) {
     case Model::D1:
         initPowerLevels(2500, {25, 500, 1000, 2500});
-        // _max_power_mw.set_and_save(2500);
-        // // Initialize and validate power levels
-        // const uint16_t  mws[] = {25, 500, 1000, 2500};
-        // _num_active_levels.set_and_save(sizeof mws / sizeof(*mws));
-        // uint8_t j = 0;
-        // for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_POWER_LEVELS; ++i) {
-        //     if(j >= _num_active_levels || _power_levels[i].mw < mws[j])
-        //         _power_levels[i].active = PowerActive::Inactive;
-        //     else if(_power_levels[i].mw >= mws[j]) {
-        //         if(_power_levels[i].mw > mws[j])
-        //             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mws[j]);
-        //         ++j;
-        //     }
-        // }
         break;
     case Model::FXR10: {
         _max_power_mw.set_and_save(10000);
@@ -493,10 +480,12 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
     _current_power = update_power_dbm(power, active);
 }
 
-// add an active power setting in dbm
-uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active)
+// add an active power setting in dbm starting the search from the index i
+uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t i)
 {
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && power <= _power_levels[i].dbm; ++i) {
+    if(i >= VTX_MAX_POWER_LEVELS)
+        i = 0;
+    for (; i < VTX_MAX_POWER_LEVELS && power <= _power_levels[i].dbm; ++i) {
         if (power == _power_levels[i].dbm) {
             if (_power_levels[i].active != active) {
                 _power_levels[i].active = active;
@@ -518,15 +507,17 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active)
 // add all active power setting in dbm
 void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
 {
-    for (uint8_t i = 0; i < nlevels; i++) {
-        update_power_dbm(power[i], PowerActive::Active);
+    if (nlevels > VTX_MAX_POWER_LEVELS)
+        nlevels = VTX_MAX_POWER_LEVELS;
+    for (uint8_t i = 0, j = i; i < nlevels; ++i) {
+        j = update_power_dbm(power[i], PowerActive::Active, j);
+        // if(j >= VTX_MAX_POWER_LEVELS-1)
+        //     j = i + 1;
     }
     // invalidate the remaining ones
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (_power_levels[i].active == PowerActive::Unknown) {
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; ++i)
+        if (_power_levels[i].active == PowerActive::Unknown)
             _power_levels[i].active = PowerActive::Inactive;
-        }
-    }
 }
 
 // set the power in mw
@@ -680,7 +671,7 @@ bool AP_VideoTX::update_options() const
     }
     // check pitmode
     if ((_options & uint8_t(VideoOptions::VTX_PITMODE))
-        != (_current_options & uint8_t(VideoOptions::VTX_PITMODE))) {
+    != (_current_options & uint8_t(VideoOptions::VTX_PITMODE))) {
         return true;
     }
 
@@ -692,7 +683,7 @@ bool AP_VideoTX::update_options() const
 #endif
     // check unlock only
     if ((_options & uint8_t(VideoOptions::VTX_UNLOCKED)) != 0
-        && (_current_options & uint8_t(VideoOptions::VTX_UNLOCKED)) == 0) {
+    && (_current_options & uint8_t(VideoOptions::VTX_UNLOCKED)) == 0) {
         return true;
     }
 

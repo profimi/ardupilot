@@ -233,18 +233,26 @@ void AP_SmartAudio::update_vtx_params()
                 set_power(vtx.get_configured_power_level());
                 break;
             default:    // v1
-                switch(vtx.get_configured_power_level()) {
-                    case 1: set_power(16); break; // 200mw
-                    case 2: set_power(25); break; // 500mw
-                    case 3: set_power(40); break; // 800mw
-                    default: set_power(7); break; // 25mw
+                switch(vtx.model()) {
+                    case AP_VideoTX::Model::D1:
+                    case AP_VideoTX::Model::AKK8:
+                        set_power(vtx.get_configured_power_dac());
+                        break;
+                    case AP_VideoTX::Model::FXR10:
+                    case AP_VideoTX::Model::CUSTOM:
+                        set_power(vtx.get_configured_power_val());
+                        break;
+                    default:
+                    {
+                        uint8_t pwd = vtx.get_configured_power_dac();
+                        if(pwd == 0xFF)
+                            pwd = 7;  // 25mW pit mode
+                        set_power(pwd);
+                    }
                 }
-                break;
             }
         }
-    } else {
-        vtx.set_configuration_finished(true);
-    }
+    } else vtx.set_configuration_finished(true);
 }
 /**
  * Sends an SmartAudio Command to the vtx, waits response on the update event
@@ -522,11 +530,12 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
     } else if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v2) {
         vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
         // learn them all - it's not possible to know the mw values in v2.0 so just have to go from the spec
-        uint8_t power[] { 0, 14, 23, 27, 29 };
-        vtx.update_all_power_dbm(5, power);
-    } else {
-        vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
-    }
+        // Note: other VTX models are already initialized
+        if(vtx.model() == AP_VideoTX::Model::GENERIC) {
+            uint8_t power[] { 0, 14, 23, 27, 29 };  // dBm
+            vtx.update_all_power_dbm(5, power);
+        }
+    } else vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
     // it seems like the spec is wrong, on a unify pro32 this setting is inverted
     _vtx_use_set_freq = !(settings.mode & 1);
 
@@ -563,6 +572,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
 
     switch (header->command) {
     case SMARTAUDIO_RSP_GET_SETTINGS_V1:
+        debug("SMARTAUDIO_RSP_GET_SETTINGS_V1");
         _protocol_version = SMARTAUDIO_SPEC_PROTOCOL_v1;
         unpack_settings(&settings, (const SettingsResponseFrame *)buffer);
         settings.version = SMARTAUDIO_SPEC_PROTOCOL_v1;
@@ -571,6 +581,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         break;
 
     case SMARTAUDIO_RSP_GET_SETTINGS_V2:
+        debug("SMARTAUDIO_RSP_GET_SETTINGS_V2");
         _protocol_version = SMARTAUDIO_SPEC_PROTOCOL_v2;
         unpack_settings(&settings, (const SettingsResponseFrame *)buffer);
         settings.version = SMARTAUDIO_SPEC_PROTOCOL_v2;
@@ -579,6 +590,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         break;
 
     case SMARTAUDIO_RSP_GET_SETTINGS_V21:
+        debug("SMARTAUDIO_RSP_GET_SETTINGS_V21");
         _protocol_version = SMARTAUDIO_SPEC_PROTOCOL_v21;
         unpack_settings(&settings, (const SettingsExtendedResponseFrame *)buffer);
         settings.version = SMARTAUDIO_SPEC_PROTOCOL_v21;
@@ -592,7 +604,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         vtx.set_frequency_mhz(settings.frequency);
         vtx.set_configured_frequency_mhz(vtx.get_frequency_mhz());
         vtx.update_configured_channel_and_band();
-        debug("Frequency was set to %d", settings.frequency);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Frequency set to %d", settings.frequency);
     }
         break;
 
@@ -603,15 +615,17 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         vtx.set_configured_channel(vtx.get_channel());
         vtx.set_configured_band(vtx.get_band());
         vtx.update_configured_frequency();
-        debug("Channel was set to %d", resp->payload);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Channel set to %d", resp->payload);
     }
         break;
 
     case SMARTAUDIO_RSP_SET_POWER: {
+        debug("SMARTAUDIO_RSP_SET_POWER");
         const U16ResponseFrame *resp = (const U16ResponseFrame *)buffer;
         const uint8_t power = resp->payload & 0xFF;
         switch (_protocol_version) {
         case SMARTAUDIO_SPEC_PROTOCOL_v21:
+            debug("Setting power_dbm to %d", power);
             if (vtx.get_configured_power_dbm() != power) {
                 vtx.update_power_dbm(vtx.get_configured_power_dbm(), AP_VideoTX::PowerActive::Inactive);
             }
@@ -619,6 +633,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
             vtx.set_configured_power_mw(vtx.get_power_mw());
             break;
         case SMARTAUDIO_SPEC_PROTOCOL_v2:
+            debug("Setting power_level to %d", power);
             if (vtx.get_configured_power_level() != power) {
                 vtx.update_power_dbm(vtx.get_configured_power_dbm(), AP_VideoTX::PowerActive::Inactive);
             }
@@ -626,6 +641,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
             vtx.set_configured_power_mw(vtx.get_power_mw());
             break;
         default:
+            debug("Setting power_dac to %d", power);
             if (vtx.get_configured_power_dac() != power) {
                 vtx.update_power_dbm(vtx.get_configured_power_dbm(), AP_VideoTX::PowerActive::Inactive);
             }
@@ -633,13 +649,13 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
             vtx.set_configured_power_mw(vtx.get_power_mw());
             break;
         }
-        debug("Power was set to %d", power);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Power set to %d", power);
     }
         break;
 
     case SMARTAUDIO_RSP_SET_MODE: {
         vtx.set_options(vtx.get_configured_options()); // easiest to just make them match
-        debug("Mode was set to 0x%x", buffer[4]);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Mode set to 0x%x", buffer[4]);
     }
         break;
 

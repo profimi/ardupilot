@@ -67,6 +67,7 @@ public:
 
     static const char *band_names[];
 
+    // Note: SmartAudi v2.0 uses internal bands of a particular VTX unlike IRC Tramp
     enum VideoBand {
         BAND_A,
         BAND_o = BAND_A,
@@ -146,8 +147,8 @@ public:
     void set_power_level(uint8_t level, PowerActive active=PowerActive::Active);
     void set_power_dbm(uint8_t power, PowerActive active=PowerActive::Active);
     void set_power_dac(uint16_t power, PowerActive active=PowerActive::Active);
-    // add a new dbm setting to those supported
-    uint8_t update_power_dbm(uint8_t power, PowerActive active=PowerActive::Active);
+    // add a new dbm setting to those supported, i is the starting index
+    uint8_t update_power_dbm(uint8_t power, PowerActive active=PowerActive::Active, uint8_t i=0);
     void update_all_power_dbm(uint8_t nlevels, const uint8_t levels[]);
     void set_configured_power_mw(uint16_t power);
 

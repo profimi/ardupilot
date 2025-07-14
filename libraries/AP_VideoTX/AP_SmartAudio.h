@@ -61,7 +61,7 @@
 
 #define SMARTAUDIO_BANDCHAN_TO_INDEX(band, channel) (band * VTX_MAX_CHANNELS + (channel))
 
-//#define SA_DEBUG
+// #define SA_DEBUG
 
 class AP_SmartAudio
 {
@@ -82,7 +82,7 @@ public:
 
         uint8_t num_power_levels;
         uint8_t power_levels[8];
-        uint8_t  power_in_dbm;
+        uint8_t power_in_dbm;
 
         uint16_t pitmodeFrequency;
         bool userFrequencyMode;     // user is setting freq
