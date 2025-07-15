@@ -258,6 +258,9 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 // D1 Note: power switching works for SamertAudio and fails for the original IRC Tramp that uses power_mw value,
 // where D1 requires power_dbm value
 // AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[VTX_MAX_POWER_LEVELS] = {
+//
+// NOTE: level  - active power levels enumeration starting from 0, other entries are marked as inactive.
+// 0x1N active power levels are automatically reassigend as 0x0N
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
     { 0xFF, 0,    0, 0   }, // only in SA 2.1
@@ -269,15 +272,15 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     { 0x12, 600,  28, 30 },
     { 3,    800,  29, 40 },
     { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; AKK8/5/3
-    { 0x14, 1200, 31, 52 },
-    { 0x15, 1600, 32, 56 },
-    { 0x16, 2000, 33, 60 },
-    { 0x17, 2500, 34, 65 }, // D1; Fxr10
-    { 0x18, 3000, 35, 70 }, // AKK8/5/3
-    { 0x19, 5000, 37, 80 }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
-    { 0x1A, 7500, 39, 85 }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
-    { 0x1B, 8000, 39, 90 }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
-    { 0x1C, 10000, 40, 100 }, // Foxeer 4.9G~6G Reaper Infinity 10W
+    { 4,    1200, 31, 52 },
+    { 0x14, 1600, 32, 56 },
+    { 5,    2000, 33, 60 },
+    { 0x15, 2500, 34, 65 }, // D1; Fxr10
+    { 0x16, 3000, 35, 70 }, // AKK8/5/3
+    { 0x17, 5000, 37, 80 }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
+    { 0x18, 7500, 39, 85 }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
+    { 0x19, 8000, 39, 90 }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
+    { 0x20, 10000, 40, 100 }, // Foxeer 4.9G~6G Reaper Infinity 10W
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
 
@@ -344,7 +347,7 @@ bool AP_VideoTX::init(void)
     * @param[in] doEnum  - whether to reset and enumerate the level values corresponding to those power values,
     *   which is essential for SmartAudio 2.0
     */
-    auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws, bool doEnum=false)
+    auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws, bool doEnum=true)
     {
         _max_power_mw.set_and_save(pwrMax);
         _num_active_levels.set_and_save(mws.size());
@@ -397,7 +400,7 @@ bool AP_VideoTX::init(void)
         break;
     default:
         // Consider _max_power_mw
-        for(uint8_t  i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
+        for(uint8_t i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
             if(_power_levels[i].active != PowerActive::Inactive) {
                 if(_power_levels[i].mw > _max_power_mw)
                     _power_levels[i].active = PowerActive::Inactive;
@@ -592,8 +595,10 @@ void AP_VideoTX::validate_cpowlevs()
     for(uint8_t  i = 0; i < VTX_MAX_POWER_LEVELS; ++i) {
         if(j >= _num_active_levels || _power_levels[i].mw < _power_vals[j].mw)
             _power_levels[i].active = PowerActive::Inactive;
-        else if(_power_vals[j].mw == _power_levels[i].mw)
+        else if(_power_vals[j].mw == _power_levels[i].mw) {
+            _power_levels[i].level = j;  // _power_levels[i].level & 0xF;
             ++j;
+        }
     }
 }
 

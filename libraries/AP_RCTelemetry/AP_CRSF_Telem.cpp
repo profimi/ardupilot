@@ -149,7 +149,7 @@ void AP_CRSF_Telem::setup_custom_telemetry()
     // setup custom telemetry for current rf_mode
     update_custom_telemetry_rates(_telem_rf_mode);
 
-    debug(MAV_SEVERITY_DEBUG,"%s: custom telem init done, fw %d.%02d", get_protocol_string(), _crsf_version.major, _crsf_version.minor);
+    debug("%s: custom telem init done, fw %d.%02d", get_protocol_string(), _crsf_version.major, _crsf_version.minor);  // GCS_SEND_TEXT
 
     _custom_telem.init_done = true;
 }
@@ -501,13 +501,13 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
                 _crsf_version.minor = 0;
                 _crsf_version.major = 0;
                 disable_scheduler_entry(VERSION_PING);
-                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"%s: RX device ping failed", get_protocol_string());
+                debug("%s: RX device ping failed", get_protocol_string());  // GCS_SEND_TEXT
             } else {
                 calc_device_ping(AP_RCProtocol_CRSF::CRSF_ADDRESS_CRSF_RECEIVER);
                 uint32_t tnow_ms = AP_HAL::millis();
                 if ((tnow_ms - _crsf_version.last_request_info_ms) > 5000) {
                     _crsf_version.last_request_info_ms = tnow_ms;
-                    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"%s: requesting RX device info", get_protocol_string());
+                    debug("%s: requesting RX device info", get_protocol_string());
                 }
             }
             break;
@@ -584,11 +584,18 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
-    apvtx.set_band(vtx->band);
-    apvtx.set_channel(vtx->channel);
     if (vtx->is_in_user_frequency_mode) {
         apvtx.set_frequency_mhz(vtx->user_frequency);
+
+        AP_VideoTX::VideoBand band;
+        uint8_t channel;
+        if (AP_VideoTX::get_band_and_channel(vtx->user_frequency, band, channel)) {
+            apvtx.set_band(static_cast<uint8_t>(band));
+            apvtx.set_channel(channel);
+        }
     } else {
+        apvtx.set_band(vtx->band);
+        apvtx.set_channel(vtx->channel);
         apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
     }
     // // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)

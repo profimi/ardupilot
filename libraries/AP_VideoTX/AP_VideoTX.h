@@ -145,6 +145,12 @@ public:
     // get / set power level
     void set_power_mw(uint16_t power);
     void set_power_level(uint8_t level, PowerActive active=PowerActive::Active);
+
+    /*! @brief Set the power in dBm and update power levels
+    * 
+    * @param[in] power  - power in dBm
+    * @param[in] active  - active state of the power level
+    */
     void set_power_dbm(uint8_t power, PowerActive active=PowerActive::Active);
     void set_power_dac(uint16_t power, PowerActive active=PowerActive::Active);
     // add a new dbm setting to those supported, i is the starting index
@@ -152,7 +158,7 @@ public:
     void update_all_power_dbm(uint8_t nlevels, const uint8_t levels[]);
     void set_configured_power_mw(uint16_t power);
 
-    // Handle custom power value tables
+    //! Handle custom power value tables, considering power levels enumeration
     void validate_cpowlevs();
     void set_power_val(uint16_t power, PowerActive active=PowerActive::Active);
     uint16_t get_configured_power_val() const;

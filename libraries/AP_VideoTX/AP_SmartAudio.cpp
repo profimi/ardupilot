@@ -521,8 +521,8 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
         vtx.update_all_power_dbm(settings.num_power_levels, settings.power_levels);
     } else if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v2) {
         vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
-        // learn them all - it's not possible to know the mw values in v2.0 so just have to go from the spec
-        // Note: other VTX models are already initialized
+        // learn them all if have not been initialized yet - it's not possible to know the mw values in v2.0 so just have to go from the spec
+        // Note: 'power_levels' is not available in SmartAudio 1.0/2.0. Other VTX models are already initialized.
         if(vtx.model() == AP_VideoTX::Model::GENERIC) {
             uint8_t power[] { 0, 14, 23, 27, 29 };  // dBm
             vtx.update_all_power_dbm(5, power);
@@ -641,7 +641,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
             vtx.set_configured_power_mw(vtx.get_power_mw());
             break;
         }
-        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Power set to %d", power);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA-%u: Power set to %d", _protocol_version, power);
     }
         break;
 
