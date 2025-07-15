@@ -215,7 +215,9 @@ extern const AP_HAL::HAL& hal;
 const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L",
     "AKK5_F", // "1G3_A",
     "AKK5_L", // "1G3_B",
-    "X","3G3_A","3G3_B","P", "l","U","O","C" // "D1_S", "AKK5_U"
+    "X","3G3_A", // "3G3_B",
+    "AKK5_U",
+    "P", "l","U","O","C" // "D1_S", "AKK5_U"
 };
 
 // CAUTION: MAX_BANDS * VTX_MAX_CHANNELS <= 256 (1 byte), otherwise libraries/AP_RCTelemetry/AP_CRSF_Telem.cpp, update_vtx_params()
@@ -259,7 +261,7 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
     { 0xFF, 0,    0, 0   }, // only in SA 2.1
-    { 0,    25,   14, 7  }, // D1; AKK5
+    { 0,    25,   14, 7  }, // D1; AKK8/5/3
     { 0x11, 100,  20, 10 }, // only in SA 2.1
     { 1,    200,  23, 16 }, // AKK5
     { 0x12, 400,  26, 20 }, // only in SA 2.1
@@ -336,19 +338,27 @@ bool AP_VideoTX::init(void)
     if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
         _num_active_levels.set_and_save(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
 
-    auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws)
+    /*! @brief Power levels initialization
+    * @param[in] pwrMax  - the number of power levels
+    * @param[in] mws  - milli Watt values
+    * @param[in] doEnum  - whether to reset and enumerate the level values corresponding to those power values,
+    *   which is essential for SmartAudio 2.0
+    */
+    auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws, bool doEnum=false)
     {
         _max_power_mw.set_and_save(pwrMax);
         _num_active_levels.set_and_save(mws.size());
-        uint8_t i = 0;
+        uint8_t i = 0, n = 0;
         for(auto mw: mws) {
             for(; i < VTX_MAX_POWER_LEVELS; ++i) {
                 if(_power_levels[i].mw < mw)
                     _power_levels[i].active = PowerActive::Inactive;
                 else {
-                    if(_power_levels[i].mw == mw)
+                    if(_power_levels[i].mw == mw) {
+                        if(doEnum)
+                            _power_levels[i].level = n++;
                         ++i;
-                    else GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mw);
+                    } else GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX power list lacks predefined level: %u mW", mw);
                     break;
                 }
             }
@@ -376,7 +386,7 @@ bool AP_VideoTX::init(void)
         break;
     }
     case Model::AKK8:
-        initPowerLevels(8000, {25, 1000, 3000, 5000, 8000});
+        initPowerLevels(8000, {25, 1000, 3000, 5000, 8000}, true);
         break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {

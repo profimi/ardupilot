@@ -227,29 +227,21 @@ void AP_SmartAudio::update_vtx_params()
             debug("update power (ver %u)", _protocol_version);
             switch (_protocol_version) {
             case SMARTAUDIO_SPEC_PROTOCOL_v21:
-                set_power(vtx.get_configured_power_dbm() | 0x80);
+                set_power(0x80 | (vtx.model() != AP_VideoTX::Model::CUSTOM
+                    ? vtx.get_configured_power_dbm() : vtx.get_configured_power_val()));
                 break;
             case SMARTAUDIO_SPEC_PROTOCOL_v2:
-                set_power(vtx.get_configured_power_level());
+                if(vtx.model() != AP_VideoTX::Model::CUSTOM)
+                    set_power(vtx.get_configured_power_level());
+                else set_power(vtx.get_configured_power_val());
                 break;
             default:    // v1
-                switch(vtx.model()) {
-                    case AP_VideoTX::Model::D1:
-                    case AP_VideoTX::Model::AKK8:
-                        set_power(vtx.get_configured_power_dac());
-                        break;
-                    case AP_VideoTX::Model::FXR10:
-                    case AP_VideoTX::Model::CUSTOM:
-                        set_power(vtx.get_configured_power_val());
-                        break;
-                    default:
-                    {
-                        uint8_t pwd = vtx.get_configured_power_dac();
-                        if(pwd == 0xFF)
-                            pwd = 7;  // 25mW pit mode
-                        set_power(pwd);
-                    }
-                }
+                if(vtx.model() != AP_VideoTX::Model::CUSTOM) {
+                    uint8_t pwd = vtx.get_configured_power_dac();
+                    if(pwd == 0xFF)
+                        pwd = 7;  // 25mW pit mode; It might be that 0 is turn off and 0xFF is max that is used as conventionally undefined
+                    set_power(pwd);
+                } else set_power(vtx.get_configured_power_val());
             }
         }
     } else vtx.set_configuration_finished(true);
