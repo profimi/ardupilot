@@ -591,21 +591,25 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
     } else {
         apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
     }
-    // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)
-    switch (vtx->power) {
-        case 0:
-            apvtx.set_power_mw(25);
-            break;
-        case 1:
-            apvtx.set_power_mw(100);
-            break;
-        case 2:
-            apvtx.set_power_mw(400);
-            break;
-        case 3:
-            apvtx.set_power_mw(800);
-            break;
-    }
+    // // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)
+    // switch (vtx->power) {
+    //     case 0:
+    //         apvtx.set_power_mw(25);
+    //         break;
+    //     case 1:
+    //         apvtx.set_power_mw(100);
+    //         break;
+    //     case 2:
+    //         apvtx.set_power_mw(400);
+    //         break;
+    //     case 3:
+    //         apvtx.set_power_mw(800);
+    //         break;
+    //     case 4:
+    //         apvtx.set_power_mw(1000);
+    //         break;
+    // }
+    apvtx.set_power_mw(apvtx.power_at_lev(vtx->power));
     if (vtx->is_in_pitmode) {
         apvtx.set_options(apvtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     } else {
@@ -869,23 +873,17 @@ void AP_CRSF_Telem::update_vtx_params()
             _vtx_dbm_update = false;
         } else if (_vtx_power_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER;
-            if (vtx.get_configured_power_mw() < 26) {
+            if (vtx.get_configured_power_mw() == 0)
+                vtx.set_configured_power_mw(0);
+            else if (vtx.get_configured_power_mw() <= 25)
                 vtx.set_configured_power_mw(25);
-            } else if (vtx.get_configured_power_mw() < 201) {
-                if (vtx.get_configured_power_mw() < 101) {
+            else if (vtx.get_configured_power_mw() <= 100)
                     vtx.set_configured_power_mw(100);
-                } else {
-                    vtx.set_configured_power_mw(200);
-                }
-            } else if (vtx.get_configured_power_mw() < 501) {
-                if (vtx.get_configured_power_mw() < 401) {
-                    vtx.set_configured_power_mw(400);
-                } else {
-                    vtx.set_configured_power_mw(500);
-                }
-            } else {
-                vtx.set_configured_power_mw(800);
-            }
+            else if (vtx.get_configured_power_mw() <= 200)
+                vtx.set_configured_power_mw(200);
+            else if (vtx.get_configured_power_mw() <= 400)
+                vtx.set_configured_power_mw(400);
+            else vtx.set_configured_power_mw(vtx.get_configured_power_mw());
             _telem.ext.command.payload[1] = vtx.get_configured_power_level();
             _vtx_dbm_update = true;
         }

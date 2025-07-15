@@ -408,9 +408,9 @@ bool AP_VideoTX::init(void)
 
     // Find the index into the power table
     _current_power = 0;
-    while(_current_power < VTX_MAX_POWER_LEVELS && _power_mw > _power_levels[_current_power].mw)
+    while(_current_power < VTX_MAX_POWER_LEVELS && _power_levels[_current_power].mw < _power_mw)
         ++_current_power;
-    if(_current_power && _power_mw < _power_levels[_current_power].mw)
+    if(_current_power && _power_levels[_current_power].mw > _power_mw)
         --_current_power;
     _power_mw.set_and_save(get_power_mw());
 
@@ -453,6 +453,15 @@ uint8_t AP_VideoTX::find_current_power() const
         if (_power_mw == _power_levels[i].mw)
             return i;
     }
+    return 0;
+}
+
+uint16_t AP_VideoTX::power_at_lev(uint8_t lev, uint8_t beg) const
+{
+    for (uint8_t i = beg; i < VTX_MAX_POWER_LEVELS; ++i)
+        // Note: there might be several levels with the same value, but only the first active one is actual
+        if(lev == (_power_levels[i].level & 0xF) && _power_levels[_current_power].active == PowerActive::Active)
+            return _power_levels[i].mw;
     return 0;
 }
 
@@ -818,9 +827,9 @@ bool AP_VideoTX::set_defaults()
 void AP_VideoTX::announce_vtx_settings() const
 {
     // Output a friendly message so the user knows the VTX has been detected
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, PWR: %dmW",
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, PWR: %dmW (%dmW #%d)",
         band_names[_band.get()], _channel.get() + 1, _frequency_mhz.get(),
-        has_option(VideoOptions::VTX_PITMODE) ? 0 : _power_mw.get());
+        has_option(VideoOptions::VTX_PITMODE) ? 0 : _power_mw.get(), get_power_mw(), _current_power);
 }
 
 // change the video power based on switch input
@@ -845,6 +854,10 @@ void AP_VideoTX::change_power(int8_t position)
         while (j < VTX_MAX_POWER_LEVELS-1 && _power_levels[j].active == PowerActive::Inactive)
             ++j;
         if (i == level) {
+            if(j >= VTX_MAX_POWER_LEVELS) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The number of actual active levels (%u) < num_active_levels (%u)", i, num_active_levels);
+                return;
+            }
             power = _power_levels[j].mw;
             debug("selected power %dmw", power);
             break;

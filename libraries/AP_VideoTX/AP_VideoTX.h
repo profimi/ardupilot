@@ -208,6 +208,7 @@ public:
 
     void set_preset(uint8_t preset_no);
     Model model() const  { return static_cast<Model>(static_cast<uint8_t>(_model)); }
+    uint16_t power_at_lev(uint8_t lev, uint8_t beg=0) const;
 
     // have the parameters been updated
     bool have_params_changed() const;
