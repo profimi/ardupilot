@@ -261,15 +261,18 @@ const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNEL
 //
 // NOTE: level  - active power levels enumeration starting from 0, other entries are marked as inactive.
 // 0x1N active power levels are automatically reassigend as 0x0N
+// ATTENTION: this table should have ascendant ordering by mW and dBm;
+// level is actual only for the SmartAudio v1.0/2.0, dac only for the SmartAudio v1.0
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
-    { 0xFF, 0,    0, 0   }, // only in SA 2.1
+    { 0x10, 0,    0, 0   }, // only in SA 2.1
+    // { 0,    10,   10, 5  }, // D1; AKK8/5/3
     { 0,    25,   14, 7  }, // D1; AKK8/5/3
     { 0x11, 100,  20, 10 }, // only in SA 2.1
     { 1,    200,  23, 16 }, // AKK5
     { 0x12, 400,  26, 20 }, // only in SA 2.1
     { 2,    500,  27, 25 }, // D1; AKK5; Fxr10
-    { 0x12, 600,  28, 30 },
+    { 0x22, 600,  28, 30 },
     { 3,    800,  29, 40 },
     { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; AKK8/5/3
     { 4,    1200, 31, 52 },
@@ -354,9 +357,10 @@ bool AP_VideoTX::init(void)
         uint8_t i = 0, n = 0;
         for(auto mw: mws) {
             for(; i < VTX_MAX_POWER_LEVELS; ++i) {
-                if(_power_levels[i].mw < mw)
+                if(_power_levels[i].mw < mw) {
                     _power_levels[i].active = PowerActive::Inactive;
-                else {
+                    _power_levels[i].level = 0xFF;  // Invalidate the power level
+                } else {
                     if(_power_levels[i].mw == mw) {
                         if(doEnum)
                             _power_levels[i].level = n++;
@@ -402,8 +406,10 @@ bool AP_VideoTX::init(void)
         // Consider _max_power_mw
         for(uint8_t i = VTX_MAX_POWER_LEVELS - 1; i > 0; --i) {
             if(_power_levels[i].active != PowerActive::Inactive) {
-                if(_power_levels[i].mw > _max_power_mw)
+                if(_power_levels[i].mw > _max_power_mw) {
                     _power_levels[i].active = PowerActive::Inactive;
+                    _power_levels[i].level = 0xFF;  // Invalidate the power level
+                }
                 else break;
             }
         }
@@ -481,20 +487,6 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
             _current_power = i;
             _power_levels[i].active = active;
             debug("learned power %ddbm", power);
-            // now unlearn the "other" power level since we have no other way of guessing
-            // the supported levels
-            if ((_power_levels[i].level & 0xF0) == 0x10) {
-                _power_levels[i].level = _power_levels[i].level & 0xF;
-            }
-            if (i > 0 && _power_levels[i-1].level == _power_levels[i].level) {
-                debug("invalidated power %dwm, level %d is now %dmw", _power_levels[i-1].mw, _power_levels[i].level, _power_levels[i].mw);
-                _power_levels[i-1].level = 0xFF;
-                _power_levels[i-1].active = PowerActive::Inactive;
-            } else if (i < VTX_MAX_POWER_LEVELS-1 && _power_levels[i+1].level == _power_levels[i].level) {
-                debug("invalidated power %dwm, level %d is now %dmw", _power_levels[i+1].mw, _power_levels[i].level, _power_levels[i].mw);
-                _power_levels[i+1].level = 0xFF;
-                _power_levels[i+1].active = PowerActive::Inactive;
-            }
             return;
         }
     }
@@ -516,14 +508,18 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t 
             return i;
         }
     }
-    // handed a non-standard value, use the last slot
-    _power_levels[VTX_MAX_POWER_LEVELS-1].dbm = power;
-    _power_levels[VTX_MAX_POWER_LEVELS-1].level = 255;
-    _power_levels[VTX_MAX_POWER_LEVELS-1].dac = 255;
-    _power_levels[VTX_MAX_POWER_LEVELS-1].mw = uint16_t(roundf(powf(10, power * 0.1f)));
-    _power_levels[VTX_MAX_POWER_LEVELS-1].active = active;
-    debug("non-standard power %ddbm -> %dmw", power, _power_levels[VTX_MAX_POWER_LEVELS-1].mw);
-    return VTX_MAX_POWER_LEVELS-1;
+    // Insert new power levels if necessary, moving the previous value to the reserved custom slot
+    if(i < VTX_MAX_POWER_LEVELS) {
+        if(i < VTX_MAX_POWER_LEVELS-1)
+            _power_levels[VTX_MAX_POWER_LEVELS-1] = _power_levels[i];
+        _power_levels[i].dbm = power;
+        _power_levels[i].level = 0xFF;
+        _power_levels[i].dac = 0xFF;
+        _power_levels[i].mw = uint16_t(roundf(powf(10, power * 0.1f)));
+        _power_levels[i].active = active;
+        debug("non-standard power %ddbm -> %dmw", power, _power_levels[i].mw);
+    }
+    return i;
 }
 
 // add all active power setting in dbm
@@ -531,15 +527,16 @@ void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
 {
     if (nlevels > VTX_MAX_POWER_LEVELS)
         nlevels = VTX_MAX_POWER_LEVELS;
-    for (uint8_t i = 0, j = i; i < nlevels; ++i) {
+    for (uint8_t i = 0, j = i; i < nlevels && j < VTX_MAX_POWER_LEVELS; ++i) {
         j = update_power_dbm(power[i], PowerActive::Active, j);
-        // if(j >= VTX_MAX_POWER_LEVELS-1)
-        //     j = i + 1;
+        _power_levels[j].level = i;
     }
     // invalidate the remaining ones
     for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; ++i)
-        if (_power_levels[i].active == PowerActive::Unknown)
+        if (_power_levels[i].active == PowerActive::Unknown) {
             _power_levels[i].active = PowerActive::Inactive;
+            _power_levels[i].level = 0xFF;
+        }
 }
 
 // set the power in mw
@@ -589,14 +586,16 @@ void AP_VideoTX::set_power_dac(uint16_t power, PowerActive active)
 }
 
 // Validate custom power levels by deactivating non-specified once
-void AP_VideoTX::validate_cpowlevs()
+void AP_VideoTX::validate_cpowlevs(bool doEnum)
 {
     uint8_t  j = 0;
     for(uint8_t  i = 0; i < VTX_MAX_POWER_LEVELS; ++i) {
-        if(j >= _num_active_levels || _power_levels[i].mw < _power_vals[j].mw)
+        if(j >= _num_active_levels || _power_levels[i].mw < _power_vals[j].mw) {
             _power_levels[i].active = PowerActive::Inactive;
-        else if(_power_vals[j].mw == _power_levels[i].mw) {
-            _power_levels[i].level = j;  // _power_levels[i].level & 0xF;
+            _power_levels[i].level = 0xFF;  // Invalidate the power level
+        } else if(_power_vals[j].mw == _power_levels[i].mw) {
+            if(doEnum)
+                _power_levels[i].level = j;
             ++j;
         }
     }

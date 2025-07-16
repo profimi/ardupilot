@@ -653,7 +653,6 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
     }
 
     apvtx.set_power_dbm(vtx->power);
-
     if (vtx->pitmode) {
         apvtx.set_options(apvtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     } else {

@@ -159,7 +159,7 @@ public:
     void set_configured_power_mw(uint16_t power);
 
     //! Handle custom power value tables, considering power levels enumeration
-    void validate_cpowlevs();
+    void validate_cpowlevs(bool doEnum=true);
     void set_power_val(uint16_t power, PowerActive active=PowerActive::Active);
     uint16_t get_configured_power_val() const;
 
