@@ -200,6 +200,12 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Range: 0 32767
     AP_GROUPINFO("POW_CMW6", 27, AP_VideoTX, _cmws[5], 0),
 
+    // @Param: USER_FREQ
+    // @DisplayName: User-specified frequency (Ardupilot's VTX table) prioritization over the VTX internal one
+    // @Description: Whether to prioritize the user-specified frequency over the one corresponding to the Band/Channel in the internal VTX table
+    // @Values: 0:Use internal VTX band/channel mapping table, 1: Enforce user the specified frequency over the band/channel VTX-internal mapping
+    AP_GROUPINFO("USER_FREQ", 28, AP_VideoTX, _user_freq, 1),
+
     AP_GROUPEND
 };
 
@@ -527,7 +533,7 @@ void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
 {
     if (nlevels > VTX_MAX_POWER_LEVELS)
         nlevels = VTX_MAX_POWER_LEVELS;
-    for (uint8_t i = 0, j = i; i < nlevels && j < VTX_MAX_POWER_LEVELS; ++i) {
+    for (uint8_t i = 0, j = i; i < nlevels && j < VTX_MAX_POWER_LEVELS; ++i, ++j) {
         j = update_power_dbm(power[i], PowerActive::Active, j);
         _power_levels[j].level = i;
     }
@@ -593,8 +599,8 @@ void AP_VideoTX::validate_cpowlevs(bool doEnum)
         if(j >= _num_active_levels || _power_levels[i].mw < _power_vals[j].mw) {
             _power_levels[i].active = PowerActive::Inactive;
             _power_levels[i].level = 0xFF;  // Invalidate the power level
-        } else if(_power_vals[j].mw == _power_levels[i].mw) {
-            if(doEnum)
+        } else {
+            if(_power_vals[j].mw == _power_levels[i].mw && doEnum)
                 _power_levels[i].level = j;
             ++j;
         }

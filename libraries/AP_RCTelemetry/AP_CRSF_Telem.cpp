@@ -584,7 +584,8 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
-    if (vtx->is_in_user_frequency_mode) {
+    if (vtx->is_in_user_frequency_mode || apvtx.is_user_freq()) {
+        vtx->is_in_user_frequency_mode = true;
         apvtx.set_frequency_mhz(vtx->user_frequency);
 
         AP_VideoTX::VideoBand band;

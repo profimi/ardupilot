@@ -1283,7 +1283,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     
     // @Param: THROTTLE_ALT_MIN
     // @DisplayName: Minimum altitude to allow throttle in automatic throttle modes
-    // @Description: Allow throttle in automatic throttle modes on lower altitudes than default 10m ATO. Useful in mountain conditions
+    // @Description: Allow throttle in automatic throttle modes on altitudes starting from this one. Useful in mountain conditions
     // @Range -1000 1000
     // @Increment: 1
     // @User: Standard

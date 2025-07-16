@@ -214,6 +214,7 @@ public:
 
     void set_preset(uint8_t preset_no);
     Model model() const  { return static_cast<Model>(static_cast<uint8_t>(_model)); }
+    bool is_user_freq() const  { return _user_freq; }
     uint16_t power_at_lev(uint8_t lev, uint8_t beg=0) const;
 
     // have the parameters been updated
@@ -267,6 +268,9 @@ private:
 
     // VTX model
     AP_Int8  _model;
+    // When internal VTX table does not much the user specified Band/Channel to Frequency mapping then prioritize the user-specified frequency
+    // over the one in the internal Band/Channel table of the VTX. Actual for SmartAudio v2.0 (e.g., AKK VTX)
+    AP_Int8  _user_freq;
 
     // The number of active power levels of VTX
     AP_Int8 _num_active_levels;
