@@ -136,12 +136,13 @@ public:
     static uint16_t get_frequency_mhz(uint8_t band, uint8_t channel) { return VIDEO_CHANNELS[band][channel]; }
     static bool get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel);
 
+    // Note: only the frequencies present in the Band/Channel table are used, otherwise current Band & Channel define the frequency
     void set_frequency_mhz(uint16_t freq) { _current_frequency = freq; }
     void set_configured_frequency_mhz(uint16_t freq) { _frequency_mhz.set_and_save_ifchanged(freq); }
     uint16_t get_frequency_mhz() const { return _current_frequency; }
     uint16_t get_configured_frequency_mhz() const { return _frequency_mhz; }
     bool update_frequency() const { return _defaults_set && _frequency_mhz != _current_frequency; }
-    void update_configured_frequency();
+    void update_configured_frequency();  // sets _frequency_mhz
     // get / set power level
     void set_power_mw(uint16_t power);
     void set_power_level(uint8_t level, PowerActive active=PowerActive::Active);

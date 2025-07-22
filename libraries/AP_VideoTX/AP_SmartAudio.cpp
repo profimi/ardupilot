@@ -42,8 +42,9 @@ AP_SmartAudio *AP_SmartAudio::_singleton;
 bool AP_SmartAudio::init()
 {
     debug("SmartAudio init");
+    AP_VideoTX& vtx = AP::vtx();
 
-    if (AP::vtx().get_enabled()==0) {
+    if (!vtx.get_enabled()) {
         debug("SmartAudio protocol it's not active");
         return false;
     }
@@ -52,17 +53,28 @@ bool AP_SmartAudio::init()
     _port = AP::serialmanager().find_serial(AP_SerialManager::SerialProtocol_SmartAudio, 0);
     if (_port!=nullptr) {
         _port->configure_parity(0);
-        _port->set_stop_bits(AP::vtx().has_option(AP_VideoTX::VideoOptions::VTX_SA_ONE_STOP_BIT) ? 1 : 2);
+        _port->set_stop_bits(vtx.has_option(AP_VideoTX::VideoOptions::VTX_SA_ONE_STOP_BIT) ? 1 : 2);
         _port->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
         _port->set_options((_port->get_options() & ~AP_HAL::UARTDriver::OPTION_RXINV)
             | AP_HAL::UARTDriver::OPTION_HDPLEX | AP_HAL::UARTDriver::OPTION_PULLDOWN_TX | AP_HAL::UARTDriver::OPTION_PULLDOWN_RX);
         if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_SmartAudio::loop, void),
-                                          "SmartAudio",
-                                          768, AP_HAL::Scheduler::PRIORITY_IO, -1)) {
+                                          "SmartAudio", 768, AP_HAL::Scheduler::PRIORITY_IO, -1))
             return false;
-        }
 
-        AP::vtx().set_provider_enabled(AP_VideoTX::VTXType::SmartAudio);
+        vtx.set_provider_enabled(AP_VideoTX::VTXType::SmartAudio);
+
+        // SmartAudio 2.0 (and might be 1.0) requires user frequency mode to use internal Ardupilot VTX frequency
+        // instead of the hardware VTX frequency mapping
+        // Note: _protocol_version has not been initialized to the actual value yet
+        if(vtx.is_user_freq()) {
+            _vtx_use_set_freq = true;  // Setting only this parameter does not help to switch to the user frequency mode without setting the frequency as well
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Custom VTX frequency mode: %u", _vtx_use_set_freq);
+            // Shift frequency a bit to ensure non-standard frequency and then return to the originally requested one
+            // // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Setting custom VTX frequency: %u, PIT mode: %u"
+            // //     , vtx.get_configured_frequency_mhz() + 1, vtx.get_configured_pitmode());
+            // // set_frequency(vtx.get_configured_frequency_mhz() + 1, vtx.get_configured_pitmode());  // It works fine on boot from the battery when VTX is turned on before its initialization from Ardupilot
+            // set_frequency(vtx.get_configured_frequency_mhz(), vtx.get_configured_pitmode());
+        }
 
         return true;
     }
@@ -73,9 +85,8 @@ void AP_SmartAudio::loop()
 {
     AP_VideoTX &vtx = AP::vtx();
 
-    while (!hal.scheduler->is_system_initialized()) {
+    while (!hal.scheduler->is_system_initialized())
         hal.scheduler->delay(100);
-    }
 
     // allocate response buffer
     uint8_t _response_buffer[AP_SMARTAUDIO_MAX_PACKET_SIZE];
@@ -96,9 +107,8 @@ void AP_SmartAudio::loop()
             // repeatedly initialize UART until we know what the VTX is
             if (!_initialised) {
                 // request settings every second
-                if (requests_queue.is_empty() && !hal.util->get_soft_armed() && now - _last_request_sent_ms > 1000) {
+                if (requests_queue.is_empty() && !hal.util->get_soft_armed() && now - _last_request_sent_ms > 1000)
                     request_settings();
-                }
             }
 
             if (requests_queue.pop(current_command)) {
@@ -125,7 +135,6 @@ void AP_SmartAudio::loop()
         // On my Unify Pro32 the SmartAudio response is sent exactly 100ms after the request
         // and the initial response is 40ms long so we should wait at least 140ms before giving up
         if (now - _last_request_sent_ms < 200 && _is_waiting_response) {
-
             // setup scheduler delay to 50 ms again after response processes
             if (!read_response(_response_buffer)) {
                 hal.scheduler->delay(10);
@@ -134,17 +143,18 @@ void AP_SmartAudio::loop()
                 // before sending another command. This is needed on the Atlatl v1.
                 hal.scheduler->delay(100);
             }
-
-        } else if (_is_waiting_response) { // timeout
+        } else if (_is_waiting_response && (_initialised || now - _last_request_sent_ms > 1000)) { // timeout
             // process autobaud routine
             update_baud_rate();
             _port->discard_input();
             _inline_buffer_length = 0;
             _is_waiting_response = false;
-            debug("response timeout");
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: response timeout");
         } else if (_initialised) {
-            if (AP::vtx().have_params_changed() ||_vtx_power_change_pending
-                || _vtx_freq_change_pending || _vtx_options_change_pending) {
+            if (AP::vtx().have_params_changed() || _vtx_power_change_pending
+            || _vtx_freq_change_pending || _vtx_options_change_pending) {
+                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA inited, _vtx_use_set_freq: %u, updating params, _vtx_freq_change_pending: %u, config pending: %u"
+                    , _vtx_use_set_freq, _vtx_freq_change_pending, is_configuration_pending());
                 update_vtx_params();
                 set_configuration_pending(true);
                 vtx.set_configuration_finished(false);
@@ -152,6 +162,7 @@ void AP_SmartAudio::loop()
                 // are reflected correctly
                 request_settings();
             } else if (is_configuration_pending()) {
+                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA inited, _vtx_use_set_freq: %u, updating config", _vtx_use_set_freq);
                 AP::vtx().announce_vtx_settings();
                 set_configuration_pending(false);
                 vtx.set_configuration_finished(true);
@@ -172,11 +183,9 @@ void AP_SmartAudio::update_vtx_params()
     if (_vtx_freq_change_pending || _vtx_power_change_pending || _vtx_options_change_pending) {
         // make the desired frequency match the desired band and channel
         if (_vtx_freq_change_pending) {
-            if (vtx.update_band() || vtx.update_channel()) {
+            if (!_vtx_use_set_freq && (vtx.update_band() || vtx.update_channel()))
                 vtx.update_configured_frequency();
-            } else {
-                vtx.update_configured_channel_and_band();
-            }
+            else vtx.update_configured_channel_and_band();
         }
 
         debug("update_params(): freq %d->%d, chan: %d->%d, band: %d->%d, pwr: %d->%d, opts: %d->%d",
@@ -207,22 +216,31 @@ void AP_SmartAudio::update_vtx_params()
             }
         }
 
-        if (pitMode) {// prevent power changes in pitmode as this takes the VTX out of pitmode
+        // Prevent power changes in pitmode as this takes the VTX out of pitmode
+        if (pitMode)
             _vtx_power_change_pending = false;
-        }
 
-        // prioritize pitmode changes
+        // Prioritize pitmode changes
         if (_vtx_options_change_pending) {
+            // VTX_OPTIONS:
+            // Bit Mask Legend
+            // 0   0x1  Pitmode
+            // 1   0x2  Pitmode until armed
+            // 2   0x4  Pitmode when disarmed
+            // 3   0x8  Unlocked
+            // 4   0x10 Add leading zero byte to requests
+            // 5   0x20 Use 1 stop-bit in SmartAudio
+            // 6   0x40 Ignore CRC in SmartAudio
+            // 7   0x80 Ignore status updates in CRSF and blindly set VTX options
             debug("update mode '%c%c%c%c'", (mode & 0x8) ? 'U' : 'L',
                 (mode & 0x4) ? 'N' : ' ', (mode & 0x2) ? 'O' : ' ', (mode & 0x1) ? 'I' : ' ');
             set_operation_mode(mode);
         } else if (_vtx_freq_change_pending) {
-            debug("update frequency");
-            if (_vtx_use_set_freq) {
-                set_frequency(vtx.get_configured_frequency_mhz(), false);
-            } else {
-                set_channel(vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel());
-            }
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: changing frequency, _vtx_use_set_freq: %u, f: %u"
+                , _vtx_use_set_freq, vtx.get_configured_frequency_mhz() & SMARTAUDIO_FREQUENCY_MASK);
+            if (_vtx_use_set_freq)
+                set_frequency(vtx.get_configured_frequency_mhz(), vtx.get_configured_pitmode());
+            else set_channel(vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel());
         } else if (_vtx_power_change_pending) {
             debug("update power (ver %u)", _protocol_version);
             switch (_protocol_version) {
@@ -387,7 +405,7 @@ void AP_SmartAudio::push_uint8_command_frame(uint8_t cmd_id, uint8_t data)
     requests_queue.push_force(command);
 }
 
-// format an 16-bit command and push into the request queue
+// format an 16-bit command, including the byte order conversion, and push into the request queue
 void AP_SmartAudio::push_uint16_command_frame(uint8_t cmd_id, uint16_t data)
 {
     Packet command;
@@ -403,23 +421,23 @@ void AP_SmartAudio::push_uint16_command_frame(uint8_t cmd_id, uint16_t data)
  * */
 void AP_SmartAudio::request_settings()
 {
-    debug("request_settings()");
+    debug("HW: request_settings()");
     push_command_only_frame(SMARTAUDIO_CMD_GET_SETTINGS);
 }
 
 void AP_SmartAudio::set_operation_mode(uint8_t mode)
 {
-    debug("Setting mode to 0x%x", mode);
+    debug("HW: Setting mode to 0x%x", mode);
     push_uint8_command_frame(SMARTAUDIO_CMD_SET_MODE, mode);
 }
 
 /**
-     * Sets the frequency to transmit in the vtx.
-     * When isPitModeFreq active the freq will be set to be used when in pitmode (in range)
-     */
+ * Sets the frequency to transmit in the vtx.
+ * When isPitModeFreq active the freq will be set to be used when in pitmode (in range)
+ */
 void AP_SmartAudio::set_frequency(uint16_t frequency, bool isPitModeFreq)
 {
-    debug("Setting frequency to %d with pitmode == %d", frequency, isPitModeFreq);
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA_HW: Setting frequency: %d, pitmode: %d", frequency, isPitModeFreq);
     push_uint16_command_frame(SMARTAUDIO_CMD_SET_FREQUENCY,
         frequency | (isPitModeFreq ? SMARTAUDIO_SET_PITMODE_FREQ : 0x00));
 }
@@ -427,40 +445,38 @@ void AP_SmartAudio::set_frequency(uint16_t frequency, bool isPitModeFreq)
 // enqueue a set channel request
 void AP_SmartAudio::set_channel(uint8_t channel)
 {
-    debug("Setting channel to %d", channel);
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA_HW: Setting channel: %d", channel);
     push_uint8_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, channel);
 }
 
 /**
  * Request pitMode Frequency setted into the vtx hardware
- * */
+ */
 void AP_SmartAudio::request_pit_mode_frequency()
 {
-    debug("Requesting pit mode frequency");
+    debug("HW: Requesting pit mode frequency");
     push_uint16_command_frame(SMARTAUDIO_CMD_SET_FREQUENCY, SMARTAUDIO_GET_PITMODE_FREQ);
 }
 
 // send vtx request to set power
 void AP_SmartAudio::set_power(uint8_t power_level)
 {
-    debug("Setting power to %d", power_level);
+    debug("HW: Setting power to %d", power_level);
     push_uint8_command_frame(SMARTAUDIO_CMD_SET_POWER, power_level);
 }
 
 
 void AP_SmartAudio::set_band_channel(const uint8_t band, const uint8_t channel)
 {
-    debug("Setting band/channel to %d/%d", band, channel);
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA_HW: Setting band/channel to %d/%d", band, channel);
     push_uint16_command_frame(SMARTAUDIO_CMD_SET_CHANNEL, SMARTAUDIO_BANDCHAN_TO_INDEX(band, channel));
 }
 
 void AP_SmartAudio::unpack_frequency(AP_SmartAudio::Settings *settings, const uint16_t frequency)
 {
-    if (frequency & SMARTAUDIO_GET_PITMODE_FREQ) {
+    if (frequency & SMARTAUDIO_GET_PITMODE_FREQ)
         settings->pitmodeFrequency = frequency;
-    } else {
-        settings->frequency = frequency;
-    }
+    else settings->frequency = frequency;
 }
 
 // SmartAudio v1/v2
@@ -471,7 +487,10 @@ void AP_SmartAudio::unpack_settings(Settings *settings, const SettingsResponseFr
     settings->power = frame->power;
     settings->mode = frame->operationMode;
     settings->num_power_levels = 0;
-    unpack_frequency(settings, be16toh(frame->frequency));
+    // Consider both BigEndian and LowEndian VTX responds
+    unpack_frequency(settings
+        , (AP::vtx().get_configured_frequency_mhz() & SMARTAUDIO_FREQUENCY_MASK) == (frame->frequency & SMARTAUDIO_FREQUENCY_MASK)
+        ? frame->frequency : be16toh(frame->frequency));
 }
 
 // SmartAudio v2.1
@@ -496,16 +515,18 @@ void AP_SmartAudio::print_bytes_to_hex_string(const char* msg, const uint8_t buf
 
 void AP_SmartAudio::print_settings(const Settings* settings)
 {
-    debug("SETTINGS: VER: %u, MD: '%c%c%c%c%c', CH: %u, PWR: %u, DBM: %u FREQ: %u, BND: %u",
+     GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA SETTINGS VER: %u, MD: '%c%c%c%c%c', CH: %u, PWR: %u, DBM: %u FREQ: %u (%#x), BND: %u",
             settings->version,
             (settings->mode & 0x10) ? 'U' : 'L',// (L)ocked or (U)nlocked
             (settings->mode & 0x8) ? 'O' : ' ', // (O)ut-range pitmode
             (settings->mode & 0x4) ? 'I' : ' ', // (I)n-range pitmode
             (settings->mode & 0x2) ? 'P' : ' ', // (P)itmode running
             (settings->mode & 0x1) ? 'F' : 'C', // Set (F)requency or (C)hannel
-            settings->channel, settings->power, settings->power_in_dbm, settings->frequency, settings->band);
+            settings->channel, settings->power, settings->power_in_dbm,
+            settings->frequency & SMARTAUDIO_FREQUENCY_MASK, settings->frequency >> 14, settings->band);
 }
 
+// Fills VTX parameters from the requested settings of the VTX hardware
 void AP_SmartAudio::update_vtx_settings(const Settings& settings)
 {
     AP_VideoTX& vtx = AP::vtx();
@@ -514,6 +535,7 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
     vtx.set_frequency_mhz(settings.frequency);
     vtx.set_band(settings.band);
     vtx.set_channel(settings.channel);
+
     // SA21 sends us a complete packet with the supported power levels
     if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v21) {
         vtx.set_power_dbm(settings.power_in_dbm);
@@ -529,7 +551,7 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
         }
     } else vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
     // it seems like the spec is wrong, on a unify pro32 this setting is inverted
-    _vtx_use_set_freq = !(settings.mode & 1);
+    _vtx_use_set_freq = vtx.is_user_freq() || !(settings.mode & 1);
 
     // PITMODE | UNLOCKED
     // SmartAudio 2.1 dropped support for outband pitmode so we won't support it
@@ -555,7 +577,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
     if ((crc8_dvb_s2_update(0x00, startPtr, headerPayloadLength-2)!=*(endPtr) && !ignore_crc())
         || header->headerByte != SMARTAUDIO_HEADER_BYTE
         || header->syncByte != SMARTAUDIO_SYNC_BYTE) {
-        debug("parse_response_buffer() failed - invalid CRC or header");
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: parse_response_buffer() failed - invalid CRC or header");
         return false;
     }
     // SEND TO GCS A MESSAGE TO UNDERSTAND WHATS HAPPENING
@@ -596,7 +618,8 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         vtx.set_frequency_mhz(settings.frequency);
         vtx.set_configured_frequency_mhz(vtx.get_frequency_mhz());
         vtx.update_configured_channel_and_band();
-        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Frequency set to %d", settings.frequency);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Frequency set to %d (%#x)"
+            , settings.frequency & SMARTAUDIO_FREQUENCY_MASK, settings.frequency >> 14);
     }
         break;
 
@@ -607,7 +630,7 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
         vtx.set_configured_channel(vtx.get_channel());
         vtx.set_configured_band(vtx.get_band());
         vtx.update_configured_frequency();
-        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Channel set to %d", resp->payload);
+        GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SA: Channel set to %d (f_ap: %u)", resp->payload, vtx.get_configured_frequency_mhz());
     }
         break;
 

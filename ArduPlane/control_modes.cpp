@@ -124,7 +124,7 @@ void RC_Channel_Plane::mode_switch_changed(modeswitch_pos_t new_pos)
         return;
     }
 
-    gcs().send_text(MAV_SEVERITY_INFO, "mode_switch_changed(): setting mode #%u", new_pos);
+    gcs().send_text(MAV_SEVERITY_DEBUG, "mode_switch_changed(): setting mode #%u", new_pos);
     plane.set_mode_by_number((Mode::Number)plane.flight_modes[new_pos].get(), ModeReason::RC_COMMAND);
 }
 

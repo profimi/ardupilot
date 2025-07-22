@@ -429,9 +429,9 @@ bool AP_VideoTX::init(void)
         --_current_power;
     _power_mw.set_and_save(get_power_mw());
 
+    _current_frequency = _frequency_mhz;
     _current_band = _band;
     _current_channel = _channel;
-    _current_frequency = _frequency_mhz;
     _current_options = _options;
     _current_enabled = _enabled;
     _initialized = true;
@@ -695,26 +695,22 @@ void AP_VideoTX::update(void)
 
 bool AP_VideoTX::update_options() const
 {
-    if (!_defaults_set) {
+    if (!_defaults_set)
         return false;
-    }
     // check pitmode
     if ((_options & uint8_t(VideoOptions::VTX_PITMODE))
-    != (_current_options & uint8_t(VideoOptions::VTX_PITMODE))) {
+    != (_current_options & uint8_t(VideoOptions::VTX_PITMODE)))
         return true;
-    }
 
 #if HAL_CRSF_TELEM_ENABLED
     // using CRSF so unlock is not an option
-    if (AP::crsf_telem() != nullptr) {
+    if (AP::crsf_telem() != nullptr)
         return false;
-    }
 #endif
     // check unlock only
     if ((_options & uint8_t(VideoOptions::VTX_UNLOCKED)) != 0
-    && (_current_options & uint8_t(VideoOptions::VTX_UNLOCKED)) == 0) {
+    && (_current_options & uint8_t(VideoOptions::VTX_UNLOCKED)) == 0)
         return true;
-    }
 
     // ignore everything else
     return false;
@@ -733,15 +729,13 @@ void AP_VideoTX::set_preset(uint8_t preset_no)
 }
 
 bool AP_VideoTX::update_power() const {
-    if (!_defaults_set || _power_mw == get_power_mw() || get_pitmode()) {
+    if (!_defaults_set || _power_mw == get_power_mw() || get_pitmode())
         return false;
-    }
     // check that the requested power is actually allowed
     for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && _power_mw >= _power_levels[i].mw; i++) {
         if (_power_mw == _power_levels[i].mw
-            && _power_levels[i].active != PowerActive::Inactive) {
+        && _power_levels[i].active != PowerActive::Inactive)
             return true;
-        }
     }
     // asked for something unsupported - only SA2.1 allows this and will have already provided a list
     return false;
@@ -764,6 +758,7 @@ void AP_VideoTX::update_configured_frequency()
 }
 
 // update the configured channel and band to match the frequency
+// ATTENTION: updates _frequency_mhz by the current band and channel if it cannot be used to define the them
 void AP_VideoTX::update_configured_channel_and_band()
 {
     VideoBand band;
@@ -771,60 +766,48 @@ void AP_VideoTX::update_configured_channel_and_band()
     if (get_band_and_channel(_frequency_mhz, band, channel)) {
         _band.set_and_save(band);
         _channel.set_and_save(channel);
-    } else {
-        update_configured_frequency();
-    }
+    } else update_configured_frequency();  // sets _frequency_mhz
 }
 
 // set the current configured values if not currently set in storage
 // this is necessary so that the current settings can be seen
 bool AP_VideoTX::set_defaults()
 {
-    if (_defaults_set) {
+    if (_defaults_set)
         return false;
-    }
 
     // check that our current view of frequency matches band/channel
     // if not then force one to be correct
-    uint16_t calced_freq = get_frequency_mhz(_current_band, _current_channel);
-    if (_current_frequency != calced_freq) {
-        if (_current_frequency > 0) {
+    if(!_user_freq) {
+        uint16_t calced_freq = get_frequency_mhz(_current_band, _current_channel);
+        if (_current_frequency != calced_freq) {
             VideoBand band;
             uint8_t channel;
-            if (get_band_and_channel(_current_frequency, band, channel)) {
+            if (_current_frequency > 0 && get_band_and_channel(_current_frequency, band, channel)) {
                 _current_band = band;
                 _current_channel = channel;
-            } else {
-                _current_frequency = calced_freq;
-            }
-        } else {
-            _current_frequency = calced_freq;
+            } else _current_frequency = calced_freq;
         }
     }
 
-    if (!_options.configured()) {
+    if (!_options.configured())
         _options.set_and_save(_current_options);
-    }
-    if (!_channel.configured()) {
+    if (!_channel.configured())
         _channel.set_and_save(_current_channel);
-    }
-    if (!_band.configured()) {
+    if (!_band.configured())
         _band.set_and_save(_current_band);
-    }
-    if (!_power_mw.configured()) {
+    if (!_power_mw.configured())
         _power_mw.set_and_save(get_power_mw());
-    }
-    if (!_frequency_mhz.configured()) {
+    if (!_user_freq && !_frequency_mhz.configured())
         _frequency_mhz.set_and_save(_current_frequency);
-    }
+    else _current_frequency = _frequency_mhz;
 
     // Now check that the user didn't screw up by selecting incompatible options
     if (_frequency_mhz != get_frequency_mhz(_band, _channel)) {
-        if (_frequency_mhz > 0) {
-            update_configured_channel_and_band();
-        } else {
-            update_configured_frequency();
-        }
+        if (_frequency_mhz > 0)
+            update_configured_channel_and_band();  // Note: might update _frequency_mhz if it is not preset in the mapping table 
+        else update_configured_frequency();  // sets _frequency_mhz by the current band and channel
+        _current_frequency = _frequency_mhz;
     }
 
     _defaults_set = true;
@@ -837,9 +820,9 @@ bool AP_VideoTX::set_defaults()
 void AP_VideoTX::announce_vtx_settings() const
 {
     // Output a friendly message so the user knows the VTX has been detected
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, PWR: %dmW (%dmW #%d)",
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, PWR: %dmW #%d",
         band_names[_band.get()], _channel.get() + 1, _frequency_mhz.get(),
-        has_option(VideoOptions::VTX_PITMODE) ? 0 : _power_mw.get(), get_power_mw(), _current_power);
+        has_option(VideoOptions::VTX_PITMODE) ? 0 : _power_mw.get(), _current_power);
 }
 
 // change the video power based on switch input

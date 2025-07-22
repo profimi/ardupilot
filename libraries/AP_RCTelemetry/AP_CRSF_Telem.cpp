@@ -520,7 +520,8 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
 }
 
 // Process a frame from the CRSF protocol decoder
-bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, void* data, uint8_t length) {
+bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, void* data, uint8_t length)
+{
     switch (frame_type) {
     // this means we are connected to an RC receiver and can send telemetry
     case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
@@ -567,38 +568,48 @@ bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, voi
 }
 
 #if AP_VIDEOTX_ENABLED
-void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
-    vtx->user_frequency = be16toh(vtx->user_frequency);
+void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx)
+{
+    AP_VideoTX& apvtx = AP::vtx();
+    // Consider both BigEndian and LowEndian VTX responds
+    if(apvtx.get_configured_frequency_mhz() != vtx->user_frequency)
+        vtx->user_frequency = be16toh(vtx->user_frequency);
 
     debug("VTX: SmartAudio: %d, Avail: %d, FreqMode: %d, Band: %d, Channel: %d, Freq: %d, PitMode: %d, Pwr: %d, Pit: %d",
         vtx->smart_audio_ver, vtx->is_vtx_available, vtx->is_in_user_frequency_mode,
         vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel),
         vtx->is_in_pitmode, vtx->power, vtx->pitmode);
-    AP_VideoTX& apvtx = AP::vtx();
 
     // the user may have a VTX connected but not want AP to control it
     // (for instance because they are using myVTX on the transmitter)
-    if (!apvtx.get_enabled()) {
+    if (!apvtx.get_enabled())
         return;
-    }
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
+    bool isFreqSet = false;
     if (vtx->is_in_user_frequency_mode || apvtx.is_user_freq()) {
-        vtx->is_in_user_frequency_mode = true;
-        apvtx.set_frequency_mhz(vtx->user_frequency);
+        // Note: in case of repetitive frequency signal move this snippet to the init() together with the apvtx.is_user_freq() condition
+        if(!vtx->is_in_user_frequency_mode) {
+            // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "CRSF: apvtx.is_user_freq: %u", apvtx.is_user_freq());
+            vtx->is_in_user_frequency_mode = true;
+            apvtx.set_frequency_mhz(vtx->user_frequency);
+        }
 
         AP_VideoTX::VideoBand band;
         uint8_t channel;
         if (AP_VideoTX::get_band_and_channel(vtx->user_frequency, band, channel)) {
             apvtx.set_band(static_cast<uint8_t>(band));
             apvtx.set_channel(channel);
+            isFreqSet = true;
         }
-    } else {
+    } 
+    if (!isFreqSet) {
         apvtx.set_band(vtx->band);
         apvtx.set_channel(vtx->channel);
         apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
     }
+
     // // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)
     // switch (vtx->power) {
     //     case 0:
@@ -633,14 +644,14 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
 
 void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
 {
-    vtx->frequency = be16toh(vtx->frequency);
+    AP_VideoTX& apvtx = AP::vtx();
+    // Consider both BigEndian and LowEndian VTX responds
+    if(apvtx.get_configured_frequency_mhz() != vtx->frequency)
+        vtx->frequency = be16toh(vtx->frequency);
     debug("VTXTelemetry: Freq: %d, PitMode: %d, Power: %d", vtx->frequency, vtx->pitmode, vtx->power);
 
-    AP_VideoTX& apvtx = AP::vtx();
-
-    if (!apvtx.get_enabled()) {
+    if (!apvtx.get_enabled())
         return;
-    }
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
