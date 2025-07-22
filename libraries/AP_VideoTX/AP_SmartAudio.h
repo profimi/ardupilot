@@ -72,6 +72,10 @@ public:
         SMARTAUDIO_SPEC_PROTOCOL_v21 = 2
     };
 
+    //! High and low components of the version
+    static uint8_t ver_high(ProtocolVersion ver);
+    static uint8_t ver_low(ProtocolVersion ver);
+
     struct Settings {
         uint8_t  version;
         uint8_t  mode;
@@ -251,7 +255,7 @@ private:
     void push_uint8_command_frame(uint8_t command, uint8_t data);
     void push_uint16_command_frame(uint8_t command, uint16_t data);
 
-    static void unpack_frequency(Settings *settings, const uint16_t frequency);
+    static void unpack_frequency(Settings *settings, uint16_t frequency);
     static void unpack_settings(Settings *settings, const SettingsResponseFrame *frame);
     static void unpack_settings(Settings *settings, const SettingsExtendedResponseFrame *frame);
 

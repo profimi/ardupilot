@@ -720,7 +720,7 @@ void AP_VideoTX::set_preset(uint8_t preset_no)
 {
     // assert(preset_no < sizeof _preset && "preset_no is out of range");
     if(preset_no >= sizeof _preset) {
-        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: preset_no = %u (>= %u)", preset_no, sizeof _preset);
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting preset_no: %u (>= %u)", preset_no, sizeof _preset);
         return;
     }
     // Note: heximal instead of the decimal digit system is used to cover up to 16 bands
@@ -820,7 +820,7 @@ bool AP_VideoTX::set_defaults()
 void AP_VideoTX::announce_vtx_settings() const
 {
     // Output a friendly message so the user knows the VTX has been detected
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, PWR: %dmW #%d",
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "VTX: %s%d %dMHz, %dmW #%d",
         band_names[_band.get()], _channel.get() + 1, _frequency_mhz.get(),
         has_option(VideoOptions::VTX_PITMODE) ? 0 : _power_mw.get(), _current_power);
 }
@@ -857,7 +857,7 @@ void AP_VideoTX::change_power(int8_t position)
         }
     }
 
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX power to %u mw (#%u)", power, position);
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX pwr: %u mw #%u", power, position);
     if (power == 0) {
         // NOTE: We might intentionally want to turn off VTX to reduce/hide our radio profile unil moving to some further location
         // if (!hal.util->get_soft_armed())    // don't allow pitmode to be entered if already armed
@@ -875,7 +875,7 @@ bool AP_VideoTX::band_valid(uint8_t band) const
     // VTX Band E [0, MAX_BANDS)
     // assert(band < AP_VideoTX::VideoBand::MAX_BANDS && "The band value is out of range");
     if (band >= AP_VideoTX::VideoBand::MAX_BANDS) {
-        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: band = %u (>= %u)", band, AP_VideoTX::VideoBand::MAX_BANDS);
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting band: %u (>= %u)", band, AP_VideoTX::VideoBand::MAX_BANDS);
         return false;
     }
     return true;
@@ -885,7 +885,7 @@ bool AP_VideoTX::channel_valid(uint8_t channel) const
 {
     // Channel: 0..7
     if (channel >= 8) {
-        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting: channel = %u (>= 8)", channel);
+        GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Out of range, omitting channel: %u (>= 8)", channel);
         return false;
     }
     return true;
