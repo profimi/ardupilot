@@ -137,6 +137,7 @@ public:
     static bool get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel);
 
     // Note: only the frequencies present in the Band/Channel table are used, otherwise current Band & Channel define the frequency
+    // Current values are fetched from the VTX, configured set by the user
     void set_frequency_mhz(uint16_t freq) { _current_frequency = freq; }
     void set_configured_frequency_mhz(uint16_t freq) { _frequency_mhz.set_and_save_ifchanged(freq); }
     uint16_t get_frequency_mhz() const { return _current_frequency; }
@@ -220,7 +221,7 @@ public:
 
     // have the parameters been updated
     bool have_params_changed() const;
-    // set configured defaults from current settings, return true if defaults were set
+    // set configured defaults from current settings, return true if defaults were set by this call
     bool set_defaults();
     // display the current VTX settings in the GCS
     void announce_vtx_settings() const;

@@ -781,18 +781,16 @@ bool AP_VideoTX::set_defaults()
     if (_defaults_set)
         return false;
 
-    // check that our current view of frequency matches band/channel
-    // if not then force one to be correct
-    if(!_user_freq) {
-        uint16_t calced_freq = get_frequency_mhz(_current_band, _current_channel);
-        if (_current_frequency != calced_freq) {
-            VideoBand band;
-            uint8_t channel;
-            if (_current_frequency > 0 && get_band_and_channel(_current_frequency, band, channel)) {
-                _current_band = band;
-                _current_channel = channel;
-            } else _current_frequency = calced_freq;
-        }
+    // check that our current view of frequency matches band/channel of the HW VTX mapping
+    // if not then force one to be correct and correspond to our mapping
+    uint16_t calced_freq = get_frequency_mhz(_current_band, _current_channel);
+    if (_current_frequency != calced_freq) {
+        VideoBand band;
+        uint8_t channel;
+        if (_current_frequency > 0 && get_band_and_channel(_current_frequency, band, channel)) {
+            _current_band = band;
+            _current_channel = channel;
+        } else _current_frequency = calced_freq;
     }
 
     if (!_options.configured())
@@ -805,14 +803,12 @@ bool AP_VideoTX::set_defaults()
         _power_mw.set_and_save(get_power_mw());
     if (!_user_freq && !_frequency_mhz.configured())
         _frequency_mhz.set_and_save(_current_frequency);
-    else _current_frequency = _frequency_mhz;
 
     // Now check that the user didn't screw up by selecting incompatible options
     if (_frequency_mhz != get_frequency_mhz(_band, _channel)) {
         if (_frequency_mhz > 0)
             update_configured_channel_and_band();  // Note: might update _frequency_mhz if it is not preset in the mapping table 
         else update_configured_frequency();  // sets _frequency_mhz by the current band and channel
-        _current_frequency = _frequency_mhz;
     }
 
     _defaults_set = true;
