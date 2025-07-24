@@ -441,16 +441,21 @@ bool AP_VideoTX::init(void)
 
 bool AP_VideoTX::get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel)
 {
+    const bool approx = AP::vtx()._user_freq;
+    uint16_t df = -1;  // Error in frequency band/channel identification, -1 is the max value
+
     for (uint8_t i = 0; i < AP_VideoTX::MAX_BANDS; i++) {
         for (uint8_t j = 0; j < VTX_MAX_CHANNELS; j++) {
-            if (VIDEO_CHANNELS[i][j] == freq) {
+            if (VIDEO_CHANNELS[i][j] == freq || (approx && df > abs(VIDEO_CHANNELS[i][j] - freq))) {
                 band = VideoBand(i);
                 channel = j;
-                return true;
+                if(approx && VIDEO_CHANNELS[i][j] != freq)
+                    df = abs(VIDEO_CHANNELS[i][j] - freq);
+                else return true;
             }
         }
     }
-    return false;
+    return approx;
 }
 
 // set the current power

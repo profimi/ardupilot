@@ -972,7 +972,7 @@ bool RC_Channel::read_aux()
         if (read_6pos_switch(position)) {
             AP::vtx().set_channel(position);
             AP::vtx().set_configured_channel(AP::vtx().get_channel());
-            AP::vtx().set_configured_band(AP::vtx().get_band());
+            // AP::vtx().set_configured_band(AP::vtx().get_band());
             AP::vtx().update_configured_frequency();
             return true;
         }
@@ -981,7 +981,7 @@ bool RC_Channel::read_aux()
         int8_t position;
         if (read_6pos_switch(position)) {
             AP::vtx().set_band(position);
-            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            // AP::vtx().set_configured_channel(AP::vtx().get_channel());
             AP::vtx().set_configured_band(AP::vtx().get_band());
             AP::vtx().update_configured_frequency();
             return true;

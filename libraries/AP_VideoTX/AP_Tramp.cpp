@@ -494,11 +494,9 @@ void AP_Tramp::update()
     if (vtx.have_params_changed() && retry_count == 0) {
         // check changes in the order they will be processed
         if (vtx.update_frequency() || vtx.update_band() || vtx.update_channel()) {
-            if (vtx.update_frequency()) {
+            if (vtx.update_frequency())
                 vtx.update_configured_channel_and_band();
-            } else {
-                vtx.update_configured_frequency();
-            }
+            else vtx.update_configured_frequency();
             set_frequency(vtx.get_configured_frequency_mhz());
         }
         else if (vtx.update_power()) {

@@ -232,7 +232,7 @@ bool AP_CRSF_Telem::process_rf_mode_changes()
     if ((now - _telem_last_report_ms > 5000)) {
         // report an RF mode change or a change in telemetry rate if we haven't done so in the last 5s
         if (!rc().option_is_enabled(RC_Channels::Option::SUPPRESS_CRSF_MESSAGE) && (_telem_rf_mode != current_rf_mode || abs(int16_t(_telem_last_avg_rate) - int16_t(_scheduler.avg_packet_rate)) > 25)) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s: Link rate %dHz, Telemetry rate %dHz",
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "%s: Link rate %dHz, Telemetry rate %dHz",
                 get_protocol_string(), crsf->get_link_rate(_crsf_version.protocol), get_telemetry_rate());
         }
         // tune the scheduler based on telemetry speed high/low transitions
@@ -822,10 +822,14 @@ void AP_CRSF_Telem::update_vtx_params()
     if (_vtx_freq_change_pending || _vtx_power_change_pending || _vtx_options_change_pending) {
         // make the desired frequency match the desired band and channel
         if (_vtx_freq_change_pending) {
-            if (vtx.update_band() || vtx.update_channel()) {
+            if (!vtx.is_user_freq() && (vtx.update_band() || vtx.update_channel()))
                 vtx.update_configured_frequency();
-            } else {
+            else {
                 vtx.update_configured_channel_and_band();
+                if(vtx.is_user_freq()) {
+                    vtx.set_band(vtx.get_configured_band());
+                    vtx.set_channel(vtx.get_configured_channel());
+                }
             }
         }
 
@@ -845,11 +849,9 @@ void AP_CRSF_Telem::update_vtx_params()
         // prioritize option changes so that the pilot can get in and out of pitmode
         if (_vtx_options_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_PITMODE;
-            if (vtx.get_configured_options() & uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE)) {
+            if (vtx.get_configured_options() & uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE))
                 _telem.ext.command.payload[1] = 1;
-            } else {
-                _telem.ext.command.payload[1] = 0;
-            }
+            else _telem.ext.command.payload[1] = 0;
         } else if (_vtx_freq_change_pending && _vtx_freq_update) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_FREQ;
             _telem.ext.command.payload[1] = (vtx.get_frequency_mhz() & 0xFF00) >> 8;
@@ -878,7 +880,7 @@ void AP_CRSF_Telem::update_vtx_params()
             else if (vtx.get_configured_power_mw() <= 25)
                 vtx.set_configured_power_mw(25);
             else if (vtx.get_configured_power_mw() <= 100)
-                    vtx.set_configured_power_mw(100);
+                vtx.set_configured_power_mw(100);
             else if (vtx.get_configured_power_mw() <= 200)
                 vtx.set_configured_power_mw(200);
             else if (vtx.get_configured_power_mw() <= 400)
