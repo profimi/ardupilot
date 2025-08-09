@@ -962,7 +962,7 @@ bool RC_Channel::read_aux()
     } else if (_option == AUX_FUNC::VTX_POWER) {
         int8_t position;
         if (read_6pos_switch(position)) {
-            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "Power switch position: %u\n", position);
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Power switch pos: %u\n", position);
             AP::vtx().change_power(position);
             return true;
         }
@@ -970,6 +970,7 @@ bool RC_Channel::read_aux()
     } else if (_option == AUX_FUNC::VTX_CHANNEL) {
         int8_t position;
         if (read_6pos_switch(position)) {
+            // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Freq switch pos: %u\n", position);
             AP::vtx().set_channel(position);
             AP::vtx().set_configured_channel(AP::vtx().get_channel());
             // AP::vtx().set_configured_band(AP::vtx().get_band());

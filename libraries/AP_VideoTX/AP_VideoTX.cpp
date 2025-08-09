@@ -812,6 +812,7 @@ bool AP_VideoTX::set_defaults()
     }
 
     _defaults_set = true;
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "VTX Defaults set, freq: %u conf vs %u vtx", _frequency_mhz.get(), _current_frequency);
 
     announce_vtx_settings();
 
