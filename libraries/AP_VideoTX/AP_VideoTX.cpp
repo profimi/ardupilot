@@ -82,7 +82,7 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
     // @Param: PRESET1
     // @DisplayName: Preset #1
     // @Description: VTX preset, in form XY where X is band and Y is channel. E.g. 02 means A-band, 3-d channel
-    // Range: (MAX_BANDS - 1)*10 + (VTX_MAX_CHANNELS - 1) = 167 < 317 ((2^5-1)*10 + 2^3-1)
+    // Range: (MAX_BANDS - 1)*10 + (BAND_CHANNELS_NUM - 1) = 167 < 317 ((2^5-1)*10 + 2^3-1)
     // @Range: 0 317
     AP_GROUPINFO("PRESET1", 8, AP_VideoTX, _preset[0], 00),
 
@@ -218,80 +218,6 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
 
 extern const AP_HAL::HAL& hal;
 
-AP_VideoTX::VtxBand  band_A{{5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, "A"};  // 0 Band A, o; AKK O
-AP_VideoTX::VtxBand  band_B{{5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, "B"};  // 1 Band B, x; AKK H
-AP_VideoTX::VtxBand  band_E{{5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, "E"};  // 2 Band E; AKK T
-AP_VideoTX::VtxBand  band_F{{5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, "F"};  // 3 Airwave,FATSHARK,IRC/FS; F/I; AKK n
-AP_VideoTX::VtxBand  band_R{{5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, "R"};  // 4 Race, R
-AP_VideoTX::VtxBand  band_L{{5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, "L"};  // 5 LO Race, L; AKK b
-AP_VideoTX::VtxBand  band_AKK_F{{5129, 5159, 5189, 5219, 5249, 5279, 5309, 5339}, "AKK_F"};  // 6 AKK F
-AP_VideoTX::VtxBand  band_AKK_L{{4900, 4940, 4921, 4958, 4995, 5032, 5069, 5099}, "AKK_L"};  // 7 AKK L
-AP_VideoTX::VtxBand  band_X{{4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, "X"};  // 8 Band X, b; AKK r
-AP_VideoTX::VtxBand  band_3G3_A{{3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, "3G3_A"};  // 9 Band 3G3_A
-AP_VideoTX::VtxBand  band_AKK_U{{5960, 5980, 6000, 6020, 6030, 6040, 6050, 6060}, "AKK_U"};  // A Band AKK_U
-AP_VideoTX::VtxBand  band_P{{5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, "P"};  // B Band P, H
-AP_VideoTX::VtxBand  band_l{{5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, "l"};  // C Band l of AKK, L of Fox10; AKK P
-AP_VideoTX::VtxBand  band_U{{5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, "U"};  // D Band U; AKK E
-AP_VideoTX::VtxBand  band_O{{5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, "O"};  // E Band O; AKK A
-AP_VideoTX::VtxBand  band_C{{5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, "C"};  // F Band C, Custom
-
-AP_VideoTX::VtxBand  band_AP_L{{5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, "AP_L"};  // 5 AP_L: Ardupilot's LO = reversed standard Low Race
-AP_VideoTX::VtxBand  band_1G3_A{{1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, "1G3_A"};  // 6 1G3_A
-AP_VideoTX::VtxBand  band_1G3_B{{1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, "1G3_B"};  // 7 1G3_B
-AP_VideoTX::VtxBand  band_3G3_B{{3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, "3G3_B"};  // A Band 3G3_B
-AP_VideoTX::VtxBand  band_D1_S{{6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, "D1_S"};  // F D1 Band S
-
-AP_VideoTX::VtxBand freqs_generic[]{band_A, band_B, band_E, band_F, band_R, band_L, band_AKK_F, band_AKK_L, band_X
-    , band_3G3_A, band_AKK_U, band_P, band_l, band_U, band_O, band_C};
-constexpr uint8_t MAX_BANDS_GENERIC = sizeof(freqs_generic) / sizeof(freqs_generic[0]);
-
-AP_VideoTX::VtxBand freqs_akk8[]{band_O, band_L, band_U, band_AKK_F, band_X, band_l
-    , band_AKK_L, band_AKK_U, band_A, band_B, band_E, band_F};
-constexpr uint8_t MAX_BANDS_AKK8 = sizeof(freqs_akk8) / sizeof(freqs_akk8[0]);
-
-static_assert(MAX_BANDS_GENERIC >= MAX_BANDS_AKK8, "Unexpected size of bands in the frequency mappings");
-static_assert(MAX_BANDS_GENERIC * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
-
-// const char * AP_VideoTX::band_names[] = {"A","B","E","F","R","L",  // "AP_L"
-//     "AKK_F", // "1G3_A",
-//     "AKK_L", // "1G3_B",
-//     "X","3G3_A", "AKK_U", // "3G3_B",
-//     "P", "l","U","O","C" // "D1_S"
-// };
-
-// #define STRING(x)  #x
-
-// CAUTION: MAX_BANDS * VTX_MAX_CHANNELS <= 256 (1 byte), otherwise libraries/AP_RCTelemetry/AP_CRSF_Telem.cpp, update_vtx_params()
-// and other functions should be updated
-// Note: SmartAudio v2.0 uses internal bands of a particular VTX unlike IRC Tramp
-// ATTENTION: Must be synced with the enums: VideoBand, band_names
-// static_assert(AP_VideoTX::MAX_BANDS * VTX_MAX_CHANNELS <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
-// const uint16_t AP_VideoTX::VIDEO_CHANNELS[AP_VideoTX::MAX_BANDS][VTX_MAX_CHANNELS] =
-// {
-//     { 5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, /* 0 Band A, o; AKK O */
-//     { 5733, 5752, 5771, 5790, 5809, 5828, 5847, 5866}, /* 1 Band B, x; AKK H */
-//     { 5705, 5685, 5665, 5645, 5885, 5905, 5925, 5945}, /* 2 Band E; AKK T */
-//     { 5740, 5760, 5780, 5800, 5820, 5840, 5860, 5880}, /* 3 Airwave,FATSHARK,IRC/FS; F/I; AKK n */
-//     { 5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917}, /* 4 Race, R */
-//     { 5362, 5399, 5436, 5473, 5510, 5547, 5584, 5621}, /* 5 LO Race, L; AKK b */
-//     // { 5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, /* 5 Ardupilot's original LO Race, L */
-//     { 5129, 5159, 5189, 5219, 5249, 5279, 5309, 5339}, /* 6 AKK F */
-//     // { 1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, /* 6 Band 1G3_A */
-//     { 4900, 4940, 4921, 4958, 4995, 5032, 5069, 5099}, /* 7 AKK L */
-//     // { 1080, 1120, 1160, 1200, 1258, 1280, 1320, 1360}, /* 7 Band 1G3_B */
-//     { 4990, 5020, 5050, 5080, 5110, 5140, 5170, 5200}, /* 8 Band X, b; AKK r */
-//     { 3330, 3350, 3370, 3390, 3410, 3430, 3450, 3470}, /* 9 Band 3G3_A */
-//     { 5960, 5980, 6000, 6020, 6030, 6040, 6050, 6060}, /* A AKK U */
-//     // { 3170, 3190, 3210, 3230, 3250, 3270, 3290, 3310}, /* A Band 3G3_B */
-//     // Custom and additional bands
-//     { 5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, /* B Band P, H */
-//     { 5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, /* C Band l of AKK, L of Fox10; AKK P */
-//     { 5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, /* D Band U; AKK E */
-//     { 5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, /* E Band O; AKK A */
-//     // { 6002, 6028, 6054, 6002, 6002, 6002, 6002, 6002}, /* F D1 Band S */
-//     { 6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, /* F Band C, Custom */
-// };
-
 // Mapping of power level to milli watt to dbm
 // valid power levels from SmartAudio spec, the adjacent levels might be the actual values
 // so these are marked as level + 0x10 and will be switched if a dbm message proves it
@@ -412,6 +338,9 @@ bool AP_VideoTX::init(void)
         }
     };
 
+    // Init freqMap with the actual parameters
+    _freqMap.init(model(), is_user_freq());
+
     // Make inactive power levels exceeding the power capacity of the target VTX
     switch (model()) {
     case Model::D1:
@@ -473,26 +402,6 @@ bool AP_VideoTX::init(void)
     return true;
 }
 
-uint8_t AP_VideoTX::bands_num() const
-{
-    return model() == Model::AKK8 ? MAX_BANDS_AKK8 : MAX_BANDS_GENERIC;
-}
-
-const AP_VideoTX::VtxBand& AP_VideoTX::band(uint8_t i) const
-{
-    return model() == Model::AKK8 ? freqs_akk8[i] : freqs_generic[i];
-}
-
-// AP_VideoTX::VtxBand* AP_VideoTX::bands()
-// {
-//     return model() == Model::AKK8 ? freqs_akk8 : freqs_generic;
-// }
-
-uint16_t AP_VideoTX::frequency_map(uint8_t band, uint8_t channel) const
-{
-    return !_user_freq && model() == Model::AKK8 ? freqs_akk8[band].channels[channel] : freqs_generic[band].channels[channel];
-}
-
 bool AP_VideoTX::get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel) const
 {
     const bool approx = AP::vtx()._user_freq;
@@ -500,12 +409,12 @@ bool AP_VideoTX::get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& c
     uint16_t df = -1;  // Error in frequency band/channel identification, -1 is the max value
 
     for (uint8_t i = 0; i < bands; ++i) {
-        for (uint8_t j = 0; j < VTX_MAX_CHANNELS; ++j) {
-            if (frequency_map(i, j) == freq || (approx && df > abs(frequency_map(i, j) - freq))) {
+        for (uint8_t j = 0; j < BAND_CHANNELS_NUM; ++j) {
+            if (get_frequency_mhz(i, j) == freq || (approx && df > abs(get_frequency_mhz(i, j) - freq))) {
                 band = VideoBand(i);
                 channel = j;
-                if(approx && frequency_map(i, j) != freq)
-                    df = abs(frequency_map(i, j) - freq);
+                if(approx && get_frequency_mhz(i, j) != freq)
+                    df = abs(get_frequency_mhz(i, j) - freq);
                 else return true;
             }
         }

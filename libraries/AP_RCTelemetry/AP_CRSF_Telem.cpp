@@ -860,10 +860,10 @@ void AP_CRSF_Telem::update_vtx_params()
             _vtx_freq_update = false;
         } else if (_vtx_freq_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_CHANNEL;
-            _telem.ext.command.payload[1] = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            _telem.ext.command.payload[1] = vtx.get_configured_band() * BAND_CHANNELS_NUM + vtx.get_configured_channel();
 
             // // Note: 2 byte abs channel is required for > 32 bands with 8 channels
-            // const uint16_t  chan = static_cast<uint16_t>(vtx.get_configured_band()) * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            // const uint16_t  chan = static_cast<uint16_t>(vtx.get_configured_band()) * BAND_CHANNELS_NUM + vtx.get_configured_channel();
             // _telem.ext.command.payload[1] = chan >> 8;
             // _telem.ext.command.payload[2] = chan & 0xFF;
             // ++len;

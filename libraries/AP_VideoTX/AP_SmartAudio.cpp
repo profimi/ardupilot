@@ -255,7 +255,7 @@ void AP_SmartAudio::update_vtx_params()
                 , !!(vtx.get_configured_frequency_mhz() & SMARTAUDIO_GET_PITMODE_FREQ));
             if (_vtx_use_set_freq)
                 set_frequency(vtx.get_configured_frequency_mhz(), vtx.get_configured_pitmode());
-            else set_channel(vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel());
+            else set_channel(vtx.get_configured_band() * BAND_CHANNELS_NUM + vtx.get_configured_channel());
             if(!vtx.update_frequency())
                 _vtx_freq_change_pending = false;
         } else if (_vtx_power_change_pending) {
@@ -505,8 +505,8 @@ void AP_SmartAudio::unpack_frequency(AP_SmartAudio::Settings *settings, uint16_t
 // SmartAudio v1/v2
 void AP_SmartAudio::unpack_settings(Settings *settings, const SettingsResponseFrame *frame)
 {
-    settings->channel = frame->channel % VTX_MAX_CHANNELS;
-    settings->band = frame->channel / VTX_MAX_CHANNELS;
+    settings->channel = frame->channel % BAND_CHANNELS_NUM;
+    settings->band = frame->channel / BAND_CHANNELS_NUM;
     settings->power = frame->power;
     settings->mode = frame->operationMode;
     settings->num_power_levels = 0;
@@ -656,8 +656,8 @@ bool  AP_SmartAudio::parse_response_buffer(const uint8_t *buffer)
 
     case SMARTAUDIO_RSP_SET_CHANNEL: {
         const U8ResponseFrame *resp = (const U8ResponseFrame *)buffer;
-        vtx.set_band(resp->payload / VTX_MAX_CHANNELS);
-        vtx.set_channel(resp->payload % VTX_MAX_CHANNELS);
+        vtx.set_band(resp->payload / BAND_CHANNELS_NUM);
+        vtx.set_channel(resp->payload % BAND_CHANNELS_NUM);
         vtx.set_configured_channel(vtx.get_channel());
         vtx.set_configured_band(vtx.get_band());
         vtx.update_configured_frequency();

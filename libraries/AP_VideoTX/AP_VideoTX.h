@@ -15,30 +15,24 @@
 #pragma once
 
 #include "AP_VideoTX_config.h"
-#include <array>
 
 #if AP_VIDEOTX_ENABLED
 
+#include "AP_VideoTX_freqs.h"
 #include <AP_Param/AP_Param.h>
 
-constexpr uint8_t VTX_MAX_CHANNELS = 8;
+using VTX::BAND_CHANNELS_NUM;  // VTX_MAX_CHANNELS = 8;
 constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7, typically 5-6
 extern const uint8_t VTX_MAX_POWER_LEVELS;  // = 19;
 
 class AP_VideoTX {
 public:
+    using Model = VTX::Model;
+    using Band = VTX::Band;
+    using VideoBand = uint8_t;
+
     AP_VideoTX();
     ~AP_VideoTX();
-
-    // VTX Model
-    enum class Model: uint8_t {
-        GENERIC = 0,
-        D1 = 1,  // D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1
-        FXR10 = 2,  // Foxeer 4.9G~6G Reaper Infinity 10W 80CH VTx; accepts old IRC Tramp mW values for another actual power levels: 25 -> 500mw, 100 -> 2.5W, 200 -> 5W, 400 -> 7.5W, 600 -> 10W
-        // AKK5 = 3,  // Accepts IRC Tramp values in levels: 0 .. 4; AKK Ultra Long Range 5W: 25/200/500/1000/3000/5000mW
-        AKK8 = 3,  // AKK TX8000AC Ultra Long Range 8W: 20/1000/3000/5000/8000 mW
-        CUSTOM = 9  // 6 custom power values
-    };
 
     /* Do not allow copies */
     CLASS_NO_COPY(AP_VideoTX);
@@ -63,60 +57,6 @@ public:
         VTX_SA_ONE_STOP_BIT   = (1 << 5),
         VTX_SA_IGNORE_CRC     = (1 << 6),
         VTX_CRSF_IGNORE_STAT  = (1 << 7),
-    };
-
-    // static const char *band_names[];
-    //
-    // // Note: SmartAudi v2.0 uses internal bands of a particular VTX unlike IRC Tramp
-    // enum VideoBand {
-    //     BAND_A,
-    //     BAND_o = BAND_A,
-    //     BAND_B,
-    //     BAND_x = BAND_B,
-    //     BAND_AKK_H = BAND_B,
-    //     BAND_E,
-    //     BAND_AKK_T = BAND_E,
-    //     FATSHARK,  // Airwave
-    //     BAND_F = FATSHARK,
-    //     BAND_IRC_I = FATSHARK,
-    //     BAND_AKK_n = FATSHARK,
-    //     RACEBAND,
-    //     BAND_R = RACEBAND,
-    //     LOW_RACEBAND,
-    //     BAND_L = LOW_RACEBAND,
-    //     BAND_AKK_b = LOW_RACEBAND,
-    //     // BAND_AP_L,  // Ardupilot's original LO Race = reversed L
-    //     BAND_AKK_F,
-    //     // BAND_1G3_A,
-    //     BAND_AKK_L,
-    //     // BAND_1G3_B,
-    //     BAND_X,
-    //     BAND_b = BAND_X,
-    //     BAND_AKK_r = BAND_X,
-    //     BAND_3G3_A,
-    //     BAND_AKK_U,
-    //     // BAND_3G3_B,
-    //     // Custom bands
-    //     BAND_P,
-    //     BAND_H = BAND_P,
-    //     BAND_l,
-    //     BAND_AKK_P = BAND_l,
-    //     BAND_U,
-    //     BAND_AKK_E = BAND_U,
-    //     BAND_O,
-    //     BAND_AKK_A = BAND_O,
-    //     // BAND_D1_S,
-    //     BAND_C,
-    //     MAX_BANDS
-    //     // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp have been
-    //     // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
-    // };
-
-    using VideoBand = uint8_t;
-
-    struct VtxBand {
-        uint16_t channels[VTX_MAX_CHANNELS];
-        const char *name;
     };
 
     enum class PowerActive {
@@ -149,12 +89,10 @@ public:
 
     PowerValue _power_vals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];  // Custom or specialized power values if necessary
 
-    uint8_t bands_num() const;  /// The number of bands in the current VTX model
-    const VtxBand& band(uint8_t i) const;  /// Specific band of the current VTX model
-    // static const uint16_t VIDEO_CHANNELS[MAX_BANDS][VTX_MAX_CHANNELS];
-    uint16_t frequency_map(uint8_t band, uint8_t channel) const;  /// Current VTX frequency map
+    uint8_t bands_num() const  { return _freqMap.bands_num(); }  /// The number of bands in the current VTX model
+    const Band& band(uint8_t i) const  { return _freqMap.band(i); }  /// Specific band of the current VTX model
 
-    uint16_t get_frequency_mhz(uint8_t band, uint8_t channel) const  { return frequency_map(band, channel); }  // VIDEO_CHANNELS[band][channel];
+    uint16_t get_frequency_mhz(uint8_t band, uint8_t channel) const  { return _freqMap.freq(band, channel); }
     bool get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel) const;
 
     // Note: only the frequencies present in the Band/Channel table are used, otherwise current Band & Channel define the frequency
@@ -307,6 +245,9 @@ private:
     bool _defaults_set;
     // true when configuration have been applied successfully to the VTX
     bool _configuration_finished;
+
+    // VTX frequency mapping to bands/channels and bands titles
+    VTX::FreqMap _freqMap;
 
     // types of VTX providers
     uint8_t _types;
