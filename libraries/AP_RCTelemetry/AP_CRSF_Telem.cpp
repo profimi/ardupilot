@@ -577,7 +577,7 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx)
 
     debug("VTX: SmartAudio: %d, Avail: %d, FreqMode: %d, Band: %d, Channel: %d, Freq: %d, PitMode: %d, Pwr: %d, Pit: %d",
         vtx->smart_audio_ver, vtx->is_vtx_available, vtx->is_in_user_frequency_mode,
-        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel),
+        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : apvtx.get_frequency_mhz(vtx->band, vtx->channel),
         vtx->is_in_pitmode, vtx->power, vtx->pitmode);
 
     // the user may have a VTX connected but not want AP to control it
@@ -598,7 +598,7 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx)
 
         AP_VideoTX::VideoBand band;
         uint8_t channel;
-        if (AP_VideoTX::get_band_and_channel(vtx->user_frequency, band, channel)) {
+        if (apvtx.get_band_and_channel(vtx->user_frequency, band, channel)) {
             apvtx.set_band(static_cast<uint8_t>(band));
             apvtx.set_channel(channel);
             isFreqSet = true;
@@ -607,7 +607,7 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx)
     if (!isFreqSet) {
         apvtx.set_band(vtx->band);
         apvtx.set_channel(vtx->channel);
-        apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
+        apvtx.set_frequency_mhz(apvtx.get_frequency_mhz(vtx->band, vtx->channel));
     }
 
     apvtx.set_power_mw(apvtx.power_at_lev(vtx->power));
@@ -641,7 +641,7 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
 
     AP_VideoTX::VideoBand band;
     uint8_t channel;
-    if (AP_VideoTX::get_band_and_channel(vtx->frequency, band, channel)) {
+    if (apvtx.get_band_and_channel(vtx->frequency, band, channel)) {
         apvtx.set_band(static_cast<uint8_t>(band));
         apvtx.set_channel(channel);
     }

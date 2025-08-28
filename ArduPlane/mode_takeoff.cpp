@@ -62,7 +62,7 @@ const AP_Param::GroupInfo ModeTakeoff::var_info[] = {
 
     // @Param: CTL_ALTR
     // @DisplayName: Takeoff control signals release on current altitude
-    // @Description: Control signals release ratio in the Takeoff mode on current altitude. Recommended value: 0.1-0.3. Provides mild takeoff without abrupt maneuvers near the ground
+    // @Description: Control signals release ratio in the Takeoff mode on current altitude. Recommended value: 0.1-0.3. Boosts resistance to crosswinds
     // @Units: ratio
     // @Range: 0.0 1.0
     // @Increment: 0.01

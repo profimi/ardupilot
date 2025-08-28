@@ -149,7 +149,7 @@ typedef enum
     SRXL_CMD_BIND_INFO,
 } SRXL_CMD;
 
-// // VTX Band (see AP_VideoTX::VIDEO_CHANNELS in libraries\AP_VideoTX\AP_VideoTX.cpp)
+// // VTX Band (see AP_VideoTX::VIDEO_CHANNELS/frequency_map in libraries\AP_VideoTX\AP_VideoTX.cpp)
 // #define VTX_BAND_FATSHARK   (0)
 // #define VTX_BAND_RACEBAND   (1)
 // #define VTX_BAND_E_BAND     (2)

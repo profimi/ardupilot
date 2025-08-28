@@ -65,40 +65,58 @@ public:
         VTX_CRSF_IGNORE_STAT  = (1 << 7),
     };
 
-    static const char *band_names[];
+    // static const char *band_names[];
+    //
+    // // Note: SmartAudi v2.0 uses internal bands of a particular VTX unlike IRC Tramp
+    // enum VideoBand {
+    //     BAND_A,
+    //     BAND_o = BAND_A,
+    //     BAND_B,
+    //     BAND_x = BAND_B,
+    //     BAND_AKK_H = BAND_B,
+    //     BAND_E,
+    //     BAND_AKK_T = BAND_E,
+    //     FATSHARK,  // Airwave
+    //     BAND_F = FATSHARK,
+    //     BAND_IRC_I = FATSHARK,
+    //     BAND_AKK_n = FATSHARK,
+    //     RACEBAND,
+    //     BAND_R = RACEBAND,
+    //     LOW_RACEBAND,
+    //     BAND_L = LOW_RACEBAND,
+    //     BAND_AKK_b = LOW_RACEBAND,
+    //     // BAND_AP_L,  // Ardupilot's original LO Race = reversed L
+    //     BAND_AKK_F,
+    //     // BAND_1G3_A,
+    //     BAND_AKK_L,
+    //     // BAND_1G3_B,
+    //     BAND_X,
+    //     BAND_b = BAND_X,
+    //     BAND_AKK_r = BAND_X,
+    //     BAND_3G3_A,
+    //     BAND_AKK_U,
+    //     // BAND_3G3_B,
+    //     // Custom bands
+    //     BAND_P,
+    //     BAND_H = BAND_P,
+    //     BAND_l,
+    //     BAND_AKK_P = BAND_l,
+    //     BAND_U,
+    //     BAND_AKK_E = BAND_U,
+    //     BAND_O,
+    //     BAND_AKK_A = BAND_O,
+    //     // BAND_D1_S,
+    //     BAND_C,
+    //     MAX_BANDS
+    //     // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp have been
+    //     // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
+    // };
 
-    // Note: SmartAudi v2.0 uses internal bands of a particular VTX unlike IRC Tramp
-    enum VideoBand {
-        BAND_A,
-        BAND_o = BAND_A,
-        BAND_B,
-        BAND_x = BAND_B,
-        BAND_E,
-        FATSHARK,  // Airwave
-        BAND_F = FATSHARK,
-        RACEBAND,
-        BAND_R = RACEBAND,
-        LOW_RACEBAND,
-        BAND_L = LOW_RACEBAND,
-        // BAND_1G3_A,
-        BAND_AKK5_F,
-        // BAND_1G3_B,
-        BAND_AKK5_L,
-        BAND_X,
-        BAND_b = BAND_X,
-        BAND_3G3_A,
-        BAND_3G3_B,
-        // Custom bands
-        BAND_P,
-        BAND_H = BAND_P,
-        BAND_l,
-        BAND_U,
-        BAND_O,
-        // BAND_D1_S, BAND_AKK5_U
-        BAND_C,
-        MAX_BANDS
-        // ATTENTION: SmartAudio channel setting and AP_CRSF_Telem.cpp have been
-        // reimplemented to consider multi-byte frequency tables if MAX_BANDS > 16
+    using VideoBand = uint8_t;
+
+    struct VtxBand {
+        uint16_t channels[VTX_MAX_CHANNELS];
+        const char *name;
     };
 
     enum class PowerActive {
@@ -131,10 +149,13 @@ public:
 
     PowerValue _power_vals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];  // Custom or specialized power values if necessary
 
-    static const uint16_t VIDEO_CHANNELS[MAX_BANDS][VTX_MAX_CHANNELS];
+    uint8_t bands_num() const;  /// The number of bands in the current VTX model
+    const VtxBand& band(uint8_t i) const;  /// Specific band of the current VTX model
+    // static const uint16_t VIDEO_CHANNELS[MAX_BANDS][VTX_MAX_CHANNELS];
+    uint16_t frequency_map(uint8_t band, uint8_t channel) const;  /// Current VTX frequency map
 
-    static uint16_t get_frequency_mhz(uint8_t band, uint8_t channel) { return VIDEO_CHANNELS[band][channel]; }
-    static bool get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel);
+    uint16_t get_frequency_mhz(uint8_t band, uint8_t channel) const  { return frequency_map(band, channel); }  // VIDEO_CHANNELS[band][channel];
+    bool get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel) const;
 
     // Note: only the frequencies present in the Band/Channel table are used, otherwise current Band & Channel define the frequency
     // Current values are fetched from the VTX, configured set by the user
