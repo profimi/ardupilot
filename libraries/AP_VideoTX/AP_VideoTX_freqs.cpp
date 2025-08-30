@@ -17,7 +17,7 @@ Band band_P{{5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, "P"};  // B Band P
 Band band_l{{5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, "l"};  // C Band l of AKK, L of Fox10; AKK P
 Band band_U{{5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, "U"};  // D Band U; AKK E
 Band band_O{{5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, "O"};  // E Band O; AKK A
-Band band_C{{5865, 5845, 5825, 5805, 5785, 5765, 5745, 5725}, "C"};  // F Band C, Custom
+Band band_C{{6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, "C"};  // F Band C, Custom
 
 Band band_AP_L{{5621, 5584, 5547, 5510, 5473, 5436, 5399, 5362}, "AP_L"};  // 5 AP_L: Ardupilot's LO = reversed standard Low Race
 Band band_1G3_A{{1080, 1120, 1160, 1200, 1240, 1280, 1320, 1360}, "1G3_A"};  // 6 1G3_A
@@ -35,7 +35,11 @@ Band freqs_akk8[]{band_O, band_L, band_U, band_AKK_F, band_X, band_l
     , band_AKK_L, band_AKK_U, band_A, band_B, band_E, band_F};
 constexpr uint8_t MAX_BANDS_AKK8 = sizeof(freqs_akk8) / sizeof(freqs_akk8[0]);
 
-static_assert(MAX_BANDS_GENERIC >= MAX_BANDS_AKK8, "Unexpected size of bands in the frequency mappings");
+// Rapidfire IRC:  IRC/FatShark, RaceBand, LowRace, Band A, B, E, Favorites
+Band freqs_rfire[]{band_F, band_R, band_L, band_A, band_B, band_E, band_C};
+constexpr uint8_t MAX_BANDS_RFIRE = sizeof(freqs_rfire) / sizeof(freqs_rfire[0]);
+
+static_assert(MAX_BANDS_GENERIC >= MAX_BANDS_AKK8 && MAX_BANDS_GENERIC >= MAX_BANDS_RFIRE, "Unexpected size of bands in the frequency mappings");
 static_assert(MAX_BANDS_GENERIC * BAND_CHANNELS_NUM <= 256, "VTX channel operations, including telemetry should be adapted for 2-byte absolute channel.");
 
 

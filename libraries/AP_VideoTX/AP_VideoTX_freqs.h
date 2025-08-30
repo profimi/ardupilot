@@ -26,8 +26,8 @@ struct Band {
 
 class FreqMap {
 private:
-    Model _model;
-    bool _forceFreq;
+    Model _model;   /// VTX model
+    bool _forceFreq;  /// Force VTX switching by the specified frequency rather than index in the frequency mapping table of the VTX; Essential for SmartAudio 2.0
 public:
     // FreqMap(Model model, bool forceFreq);
     // virtual ~FreqMap()  {}
