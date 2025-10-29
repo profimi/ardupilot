@@ -37,5 +37,4 @@ public:
     const Band& band(uint8_t i) const;  /// Specific band of the current VTX model
     uint16_t freq(uint8_t band, uint8_t channel) const;  /// Current VTX frequency map
 };
-
-};  // VTX
+}  // VTX

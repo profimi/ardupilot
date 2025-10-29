@@ -34,6 +34,8 @@
 #define CRSF_HEADER_LEN     2U       // header length
 #define CRSF_FRAME_PAYLOAD_MAX (CRSF_FRAMELEN_MAX - CRSF_HEADER_LEN)     // maximum size of the frame length field in a packet
 #define CRSF_FRAME_LENGTH_MIN 2 // min value for _frame.length
+#define UART_BAUDRATE      0         // Retain UART baudrate
+#define TBS_BAUDRATE       400000U   // TBS Crossfire, Sinelink SL
 #define CRSF_BAUDRATE      416666U
 #define ELRS_BAUDRATE      420000U
 #define CRSF_TX_TIMEOUT    500000U   // the period after which the transmitter is considered disconnected (matches copters failsafe)
@@ -54,7 +56,18 @@ public:
     // bootstrap baudrate
     uint32_t get_bootstrap_baud_rate() const {
 #if AP_RC_CHANNEL_ENABLED
-        return rc().option_is_enabled(RC_Channels::Option::ELRS_420KBAUD) ? ELRS_BAUDRATE : CRSF_BAUDRATE;
+        const uint8_t  baudConf = rc().option_is_enabled(RC_Channels::Option::TBS_400KBAUD) << 1 | rc().option_is_enabled(RC_Channels::Option::ELRS_420KBAUD);
+        switch(baudConf) {
+        case 1:
+            return ELRS_BAUDRATE;
+        case 2:
+            return TBS_BAUDRATE;
+        case 3:
+            return UART_BAUDRATE;
+        case 0:
+        default:
+             return CRSF_BAUDRATE;
+        }
 #else
         return CRSF_BAUDRATE;
 #endif
