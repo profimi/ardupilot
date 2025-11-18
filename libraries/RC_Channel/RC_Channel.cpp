@@ -732,6 +732,8 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #if HAL_GENERATOR_ENABLED
     case AUX_FUNC::LOWEHEISER_THROTTLE:
 #endif
+    // Custom extensions
+    case AUX_FUNC::KILL_THROTTLE_LR:
         break;
 
 #if HAL_ADSB_ENABLED
@@ -909,6 +911,14 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
 #if HAL_MOUNT_ENABLED
     { AUX_FUNC::MOUNT_LRF_ENABLE, "Mount LRF Enable"},
 #endif
+#if AP_VIDEOTX_ENABLED
+    {AUX_FUNC::VTX_POWER, "VTX Power"},
+    {AUX_FUNC::VTX_PRESET, "VTX Bands & Channels Preset"},
+    {AUX_FUNC::VTX_BAND, "VTX Bands"},
+    {AUX_FUNC::VTX_CHANNEL, "VTX Channels"},
+#endif
+    // Custom extensions
+    {AUX_FUNC::KILL_THROTTLE_LR, "Kill Throttle L/R Switch"},
 };
 
 /* lookup the announcement for switch change */

@@ -228,6 +228,12 @@ public:
         // if you add something here, make sure to update the documentation of the parameter in RC_Channel.cpp!
         // also, if you add an option >255, you will need to fix duplicate_options_exist
 
+        // Extra control functions
+        // KILL_MOTOR12 =       140,  // Set the lowest value of throttle for motor 1 / 2
+        KILL_THROTTLE_LR =   140,  // Set the lowest value of throttle_l (RC switch LOW) / throttle_r (RC switch HIGHT), which are bound to motors x / y using relation 1:n
+        // KILL_MOTOR1 =        141,  // Set the lowest value of throttle for motor 1
+        // KILL_MOTOR2 =        142,  // Set the lowest value of throttle for motor 2
+
         // options 150-199 continue user rc switch options
         CRUISE =             150,  // CRUISE mode
         TURTLE =             151,  // Turtle mode - flip over after crash

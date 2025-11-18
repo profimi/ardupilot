@@ -19,6 +19,13 @@
 #include "Plane.h"
 #include <utility>
 
+#define SERVO_DEBUG
+#ifdef SERVO_DEBUG
+# define debug(fmt, args...)	hal.console->printf("SRV: " fmt "\n", ##args)
+#else
+# define debug(fmt, args...)	do {} while(0)
+#endif
+
 /*****************************************
 * Throttle slew limit
 *****************************************/
@@ -645,10 +652,8 @@ void Plane::set_throttle(void)
         } else {
             // default
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
-
         }
     }
-
 }
 
 /*
@@ -945,6 +950,34 @@ void Plane::set_servos(void)
 #endif
     }
 #endif  // AP_ICENGINE_ENABLED
+
+    // Overwrite standard servo control if necessary
+    // Note: correct the throttle left/ight values after the set_takeoff_expected() and other corrections and
+    // immediately before servos_output() to ensure that the toogle switch is effective
+    RC_Channel* throttles_kill_switch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::KILL_THROTTLE_LR);
+    if (throttles_kill_switch != nullptr) {
+        debug("KILL_THROTTLE_LR: %u, c: %u", (uint8_t)throttles_kill_switch->get_aux_switch_pos(), throttles_kill_switch->ch());
+
+        switch(throttles_kill_switch->get_aux_switch_pos()) {
+        case RC_Channel::AuxSwitchPos::LOW:
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
+            debug("Throttle left is disabled");
+            break;
+        case RC_Channel::AuxSwitchPos::HIGH:
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0);
+            debug("Throttle right is disabled");
+            break;
+        // case MIDDLE:
+        default:
+            break;
+        }
+    }
+    // if (throttles_kill_switch != nullptr && throttles_kill_switch->get_aux_switch_pos() == RC_Channel::AuxSwitchPos::HIGH) {
+    //     // // Kill motor 2 - set to minimum throttle; motor 2 is on output 2 (index 1)
+    //     // SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
+    //     // Alternative: Use direct output index
+    //     hal.rcout->write(1, 1000);  // Output 2 (0-indexed) = 1000μs
+    // }
 
     // run output mixer and send values to the hal for output
     servos_output();
