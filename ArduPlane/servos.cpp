@@ -971,7 +971,7 @@ void Plane::set_servos(void)
         default:
             break;
         }
-    }
+    } else debug("KILL_THROTTLE_LR is not assigned to any RC CH");
     // if (throttles_kill_switch != nullptr && throttles_kill_switch->get_aux_switch_pos() == RC_Channel::AuxSwitchPos::HIGH) {
     //     // // Kill motor 2 - set to minimum throttle; motor 2 is on output 2 (index 1)
     //     // SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
