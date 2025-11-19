@@ -1696,31 +1696,6 @@ bool RC_Channel::do_aux_function(const AuxFuncTrigger &trigger)
         break;
 
     case AUX_FUNC::KILL_THROTTLE_LR:
-        // {
-        //     RC_Channel* throttles_kill_switch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::KILL_THROTTLE_LR);
-        //     if (throttles_kill_switch != nullptr) {
-        //         debug("KILL_THROTTLE_LR: %u, sigSrc: %u, ch: %u", (uint8_t)ch_flag, trigger.source, trigger.source_index);
-        //         switch(ch_flag) {
-        //         case RC_Channel::AuxSwitchPos::LOW:
-        //             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
-        //             debug("Throttle left is disabled");
-        //             break;
-        //         case RC_Channel::AuxSwitchPos::HIGH:
-        //             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0);
-        //             debug("Throttle right is disabled");
-        //             break;
-        //         // case MIDDLE:
-        //         default:
-        //             break;
-        //         }
-        //     } else debug("KILL_THROTTLE_LR is not assigned to any RC CH");
-        //     // if (throttles_kill_switch != nullptr && throttles_kill_switch->get_aux_switch_pos() == RC_Channel::AuxSwitchPos::HIGH) {
-        //     //     // // Kill motor 2 - set to minimum throttle; motor 2 is on output 2 (index 1)
-        //     //     // SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
-        //     //     // Alternative: Use direct output index
-        //     //     hal.rcout->write(1, 1000);  // Output 2 (0-indexed) = 1000μs
-        //     // }
-        // }
         break;
 
 #if HAL_VISUALODOM_ENABLED
