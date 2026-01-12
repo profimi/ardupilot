@@ -336,14 +336,14 @@ private:
     struct Frame _frame;
     uint8_t *_frame_bytes = (uint8_t*)&_frame;
     struct Frame _telemetry_frame;
-    uint8_t _frame_ofs;
+    uint8_t _frame_ofs;  // Offset (position) of the last received byte in _frame_bytes 
 
     const uint8_t MAX_CHANNELS = MIN((uint8_t)CRSF_MAX_CHANNELS, (uint8_t)MAX_RCIN_CHANNELS);
 
     static AP_RCProtocol_CRSF* _singleton;
 
-    void _process_byte(uint8_t byte);
-    bool check_frame(uint32_t timestamp_us);
+    void _process_byte(uint8_t byte);  // Fills _frame_bytes, being unnecessary heavy by calling check_frame() for each byte rather than once per packet
+    bool check_frame(uint32_t timestamp_us);  // Validates or omits CRSF frame; unnecessary heavy and can be optimized avoiding memmove()
     void skip_to_next_frame(uint32_t timestamp_us);
     bool decode_crsf_packet();
     bool process_telemetry(bool check_constraint = true);
