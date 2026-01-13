@@ -124,7 +124,7 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: TKOFF_THR_MINACC
     // @DisplayName: Takeoff throttle min acceleration
-    // @Description: Minimum forward acceleration in m/s/s before arming the ground speed check in auto-takeoff. This is meant to be used for hand launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For hand launches and bungee launches this should be set to around 15. Also see TKOFF_ACCEL_CNT paramter for control of full "shake to arm".
+    // @Description: Minimum forward acceleration in m/s/s before arming the ground speed check in auto-takeoff. This is meant to be used for hand launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For hand launches and bungee launches this should be set to around 15. Also see TKOFF_ACCEL_CNT parameter for control of full "shake to arm".
     // @Units: m/s/s
     // @Range: 0 30
     // @Increment: 0.1
@@ -264,7 +264,7 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: WP_LOITER_RAD
     // @DisplayName: Waypoint Loiter Radius
-    // @Description: Defines the distance from the waypoint center, the plane will maintain during a loiter. If you set this value to a negative number then the default loiter direction will be counter-clockwise instead of clockwise.
+    // @Description: Defines the distance from the waypoint center, the plane will maintain during a loiter. If you set this value to a negative number then the default loiter direction will be counter-clockwise instead of clockwise. If this value is too close to zero, the achieved loiter radius will be determined by ROLL_LIMIT_DEG.
     // @Units: m
     // @Range: -32767 32767
     // @Increment: 1
@@ -314,7 +314,7 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: AIRSPEED_STALL
     // @DisplayName: Stall airspeed
-    // @Description: If stall prevention is enabled this speed is used to calculate the minimum airspeed while banking. If this is set to 0 then the stall speed is assumed to be the minimum airspeed speed. Typically set slightly higher then true stall speed. Value is as an indicated (calibrated/apparent) airspeed.
+    // @Description: If stall prevention is enabled this speed is used to calculate the minimum airspeed while banking. It is also used during landing final as the minimum airspeed that can be demanded by the TECS, which allows using TECS_LAND_ARSPD or LAND_PF_ARSPD to achieve landings slower than AIRSPEED_MIN. If this is set to 0 then the stall speed is assumed to be the minimum airspeed speed. Typically set slightly higher then true stall speed.
     // @Units: m/s
     // @Range: 5 75
     // @User: Standard
@@ -736,14 +736,14 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: RTL_AUTOLAND
     // @DisplayName: RTL auto land
-    // @Description: Automatically begin landing sequence after arriving at RTL location. This requires the addition of a DO_LAND_START mission item, which acts as a marker for the start of a landing sequence. The closest landing sequence will be chosen to the current location. If this is set to 0 and there is a DO_LAND_START mission item then you will get an arming check failure. You can set to a value of 3 to avoid the arming check failure and use the DO_LAND_START for go-around without it changing RTL behaviour. For a value of 1 a rally point will be used instead of HOME if in range (see rally point documentation).
+    // @Description: Automatically begin landing sequence after arriving at RTL location. This requires the addition of a DO_LAND_START mission item, which acts as a marker for the start of a landing sequence. The closest landing sequence will be chosen to the current location For a value of 1 a rally point will be used instead of HOME if in range (see rally point documentation).If this is set to 0 and there is a DO_LAND_START or DO_RETURN_PATH_START mission item then you will get an arming check failure. You can set to a value of 3 to avoid the arming check failure and use the DO_LAND_START for go-around (see wiki for aborting autolandings) without it changing RTL behaviour.
     // @Values: 0:Disable,1:Fly HOME then land via DO_LAND_START mission item, 2:Go directly to landing sequence via DO_LAND_START mission item, 3:OnlyForGoAround, 4:Go directly to landing sequence via DO_RETURN_PATH_START mission item
     // @User: Standard
     GSCALAR(rtl_autoland,         "RTL_AUTOLAND",   float(RtlAutoland::RTL_DISABLE)),
 
     // @Param: CRASH_ACC_THRESH
     // @DisplayName: Crash Deceleration Threshold
-    // @Description: X-Axis deceleration threshold to notify the crash detector that there was a possible impact which helps disarm the motor quickly after a crash. This value should be much higher than normal negative x-axis forces during normal flight, check flight log files to determine the average IMU.x values for your aircraft and motor type. Higher value means less sensative (triggers on higher impact). For electric planes that don't vibrate much during fight a value of 25 is good (that's about 2.5G). For petrol/nitro planes you'll want a higher value. Set to 0 to disable the collision detector.
+    // @Description: X-Axis deceleration threshold to notify the crash detector that there was a possible impact which helps disarm the motor quickly after a crash. This value should be much higher than normal negative x-axis forces during normal flight, check flight log files to determine the average IMU.x values for your aircraft and motor type. Higher value means less sensitive (triggers on higher impact). For electric planes that don't vibrate much during fight a value of 25 is good (that's about 2.5G). For petrol/nitro planes you'll want a higher value. Set to 0 to disable the collision detector.
     // @Units: m/s/s
     // @Range: 10 127
     // @Increment: 1
@@ -1098,7 +1098,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     
     // @Param: HOME_RESET_ALT
     // @DisplayName: Home reset altitude threshold
-    // @Description: When the aircraft is within this altitude of the home waypoint, while disarmed it will automatically update the home position. Set to 0 to continously reset it.
+    // @Description: When the aircraft is within this altitude of the home waypoint, while disarmed it will automatically update the home position. Set to 0 to continuously reset it.
     // @Values: -1:Never reset,0:Always reset
     // @Range: -1 127
     // @Units: m
@@ -1309,10 +1309,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 ParametersG2::ParametersG2(void) :
     unused_integer{1}
 #if HAL_BUTTON_ENABLED
-    ,button_ptr(&plane.button)
+    , button_ptr(&plane.button)
 #endif
 #if HAL_SOARING_ENABLED
-    ,soaring_controller(plane.TECS_controller, plane.aparm)
+    , soaring_controller(plane.TECS_controller, plane.aparm)
 #endif
 {
     AP_Param::setup_object_defaults(this, var_info);

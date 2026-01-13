@@ -570,12 +570,12 @@ bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, voi
 #if AP_VIDEOTX_ENABLED
 void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
     vtx->user_frequency = be16toh(vtx->user_frequency);
+    AP_VideoTX& apvtx = AP::vtx();
 
     debug("VTX: SmartAudio: %d, Avail: %d, FreqMode: %d, Band: %d, Channel: %d, Freq: %d, PitMode: %d, Pwr: %d, Pit: %d",
         vtx->smart_audio_ver, vtx->is_vtx_available, vtx->is_in_user_frequency_mode,
-        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel),
+        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : apvtx.get_frequency_mhz(vtx->band, vtx->channel),
         vtx->is_in_pitmode, vtx->power, vtx->pitmode);
-    AP_VideoTX& apvtx = AP::vtx();
 
     // the user may have a VTX connected but not want AP to control it
     // (for instance because they are using myVTX on the transmitter)
@@ -590,23 +590,9 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
     if (vtx->is_in_user_frequency_mode) {
         apvtx.set_frequency_mhz(vtx->user_frequency);
     } else {
-        apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
+        apvtx.set_frequency_mhz(apvtx.get_frequency_mhz(vtx->band, vtx->channel));
     }
-    // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)
-    switch (vtx->power) {
-        case 0:
-            apvtx.set_power_mw(25);
-            break;
-        case 1:
-            apvtx.set_power_mw(100);
-            break;
-        case 2:
-            apvtx.set_power_mw(400);
-            break;
-        case 3:
-            apvtx.set_power_mw(800);
-            break;
-    }
+    apvtx.set_power_mw(apvtx.power_at_lev(vtx->power));
     if (vtx->is_in_pitmode) {
         apvtx.set_options(apvtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     } else {
@@ -637,7 +623,7 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
 
     AP_VideoTX::VideoBand band;
     uint8_t channel;
-    if (AP_VideoTX::get_band_and_channel(vtx->frequency, band, channel)) {
+    if (apvtx.get_band_and_channel(vtx->frequency, band, channel)) {
         apvtx.set_band(uint8_t(band));
         apvtx.set_channel(channel);
     }
@@ -844,7 +830,7 @@ void AP_CRSF_Telem::update_vtx_params()
             len++;
         } else if (_vtx_freq_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_CHANNEL;
-            _telem.ext.command.payload[1] = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            _telem.ext.command.payload[1] = vtx.get_configured_band() * BAND_CHANNELS_NUM + vtx.get_configured_channel();
             _vtx_freq_update = true;
         } else if (_vtx_power_change_pending && _vtx_dbm_update) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER_DBM;
@@ -852,23 +838,17 @@ void AP_CRSF_Telem::update_vtx_params()
             _vtx_dbm_update = false;
         } else if (_vtx_power_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER;
-            if (vtx.get_configured_power_mw() < 26) {
+            if (vtx.get_configured_power_mw() == 0)
+                vtx.set_configured_power_mw(0);
+            else if (vtx.get_configured_power_mw() <= 25)
                 vtx.set_configured_power_mw(25);
-            } else if (vtx.get_configured_power_mw() < 201) {
-                if (vtx.get_configured_power_mw() < 101) {
-                    vtx.set_configured_power_mw(100);
-                } else {
-                    vtx.set_configured_power_mw(200);
-                }
-            } else if (vtx.get_configured_power_mw() < 501) {
-                if (vtx.get_configured_power_mw() < 401) {
-                    vtx.set_configured_power_mw(400);
-                } else {
-                    vtx.set_configured_power_mw(500);
-                }
-            } else {
-                vtx.set_configured_power_mw(800);
-            }
+            else if (vtx.get_configured_power_mw() <= 100)
+                vtx.set_configured_power_mw(100);
+            else if (vtx.get_configured_power_mw() <= 200)
+                vtx.set_configured_power_mw(200);
+            else if (vtx.get_configured_power_mw() <= 400)
+                vtx.set_configured_power_mw(400);
+            else vtx.set_configured_power_mw(vtx.get_configured_power_mw());
             _telem.ext.command.payload[1] = vtx.get_configured_power_level();
             _vtx_dbm_update = true;
         }
@@ -970,7 +950,7 @@ int8_t AP_CRSF_Telem::get_vertical_speed_packed()
     float vspeed = get_vspeed_ms();
     float vertical_speed_cm_s = vspeed * 100.0f;
     const int16_t Kl = 100; // linearity constant;
-    const float Kr = .026f; // range constant;
+    const float Kr = 0.026f; // range constant;
     int8_t vspeed_packed = int8_t(logf(fabsf(vertical_speed_cm_s)/Kl + 1)/Kr);
     return vspeed_packed * (is_negative(vertical_speed_cm_s) ? -1 : 1);
 }

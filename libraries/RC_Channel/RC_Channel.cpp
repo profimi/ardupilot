@@ -62,6 +62,14 @@ extern const AP_HAL::HAL& hal;
 #include <AP_Parachute/AP_Parachute_config.h>
 #define SWITCH_DEBOUNCE_TIME_MS  200
 
+// // #define RC_CH_DEBUG
+// #ifdef RC_CH_DEBUG
+// # define debug(fmt, args...)	GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC_CH: " fmt "\n", ##args)
+// // hal.console->printf("SRV: " fmt "\n", ##args)
+// #else
+// # define debug(fmt, args...)	do {} while(0)
+// #endif
+
 const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Param: MIN
     // @DisplayName: RC min PWM
@@ -244,6 +252,9 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter, Plane}: 180:Test autotuned gains after tune is complete
     // @Values{Plane}: 181: QuickTune
     // @Values{Plane}: 184: System ID Chirp (Quadplane only)
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 197:VTX Preset
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 198:VTX Band
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 199:VTX Channel
     // @Values{Rover}: 201:Roll
     // @Values{Rover}: 202:Pitch
     // @Values{Rover}: 207:MainSail
@@ -567,23 +578,17 @@ bool RC_Channel::read_6pos_switch(int8_t& position)
         return false;  // This is an error condition
     }
 
-    if (pulsewidth < 1231) {
-        position = 0;
-    } else if (pulsewidth < 1361) {
-        position = 1;
-    } else if (pulsewidth < 1491) {
-        position = 2;
-    } else if (pulsewidth < 1621) {
-        position = 3;
-    } else if (pulsewidth < 1750) {
-        position = 4;
-    } else {
-        position = 5;
-    }
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    constexpr uint16_t  chMarks[] = {1090, 1294, 1499, 1704, 1909};
+    constexpr uint8_t  posMax = sizeof(chMarks);
+    while(position < posMax && pulsewidth >= chMarks[position])
+        ++position;
 
-    if (!debounce_completed(position)) {
+    if (!debounce_completed(position))
         return false;
-    }
 
     return true;
 }
@@ -689,6 +694,9 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
 #if AP_VIDEOTX_ENABLED
     case AUX_FUNC::VTX_POWER:
+    case AUX_FUNC::VTX_PRESET:
+    case AUX_FUNC::VTX_BAND:
+    case AUX_FUNC::VTX_CHANNEL:
 #endif
 #if AP_OPTICALFLOW_CALIBRATOR_ENABLED
     case AUX_FUNC::OPTFLOW_CAL:
@@ -894,6 +902,12 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
 #if HAL_MOUNT_ENABLED
     { AUX_FUNC::MOUNT_LRF_ENABLE, "Mount LRF Enable"},
 #endif
+#if AP_VIDEOTX_ENABLED
+    {AUX_FUNC::VTX_POWER, "VTX Power"},
+    {AUX_FUNC::VTX_PRESET, "VTX Bands & Channels Preset"},
+    {AUX_FUNC::VTX_BAND, "VTX Bands"},
+    {AUX_FUNC::VTX_CHANNEL, "VTX Channels"},
+#endif
 };
 
 /* lookup the announcement for switch change */
@@ -937,7 +951,39 @@ bool RC_Channel::read_aux()
     } else if (_option == AUX_FUNC::VTX_POWER) {
         int8_t position;
         if (read_6pos_switch(position)) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Power switch pos: %u\n", position);
             AP::vtx().change_power(position);
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_CHANNEL) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Freq switch pos: %u\n", position);
+            AP::vtx().set_channel(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            // AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_BAND) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_band(position);
+            // AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_PRESET) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_preset(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
             return true;
         }
         return false;

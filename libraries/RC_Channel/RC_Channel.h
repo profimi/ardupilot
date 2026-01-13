@@ -265,6 +265,10 @@ public:
                                   //saved for 4.7-dev feature Fixed Wing AUTOLAND Mode
         SYSTEMID =           184,  // system ID as an aux switch
 
+        VTX_PRESET =         197, // VTX preset change function
+        VTX_BAND =           198, // VTX band change function
+        VTX_CHANNEL =        199, // VTX channel change function
+
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
         PITCH =              202, // pitch input
@@ -281,7 +285,7 @@ public:
         MOUNT2_ROLL =        215, // mount2 roll input
         MOUNT2_PITCH =       216, // mount3 pitch input
         MOUNT2_YAW =         217, // mount4 yaw input
-        LOWEHEISER_THROTTLE= 218,  // allows for throttle on slider
+        LOWEHEISER_THROTTLE= 218, // allows for throttle on slider
         TRANSMITTER_TUNING = 219, // use a transmitter knob or slider for in-flight tuning
 
         // inputs 248-249 are reserved for the Skybrush fork at
