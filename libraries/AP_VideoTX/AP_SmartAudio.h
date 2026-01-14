@@ -243,8 +243,6 @@ private:
     void set_channel(uint8_t chan);
     // get the pitmode frequency
     void request_pit_mode_frequency();
-    // set the power
-    void set_power(uint16_t power_mw, uint16_t dbm);
     // set the power using power_level, spec versions 1 and 2 or dbm value for spec version 2.1
     void set_power(uint8_t power_level);
     // set the band and channel

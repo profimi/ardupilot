@@ -233,7 +233,7 @@ extern const AP_HAL::HAL& hal;
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
     { 0x10, 0,    0, 0   }, // only in SA 2.1
-    { 0,    10,   10, 5  }, // D1; TBS_UPD
+    { 0x20, 10,   10, 5  }, // TBS_UPD
     { 0,    25,   14, 7  }, // D1; TBS_UPD
     { 0x11, 100,  20, 10 }, // only in SA 2.1; TBS_UPD
     { 1,    200,  23, 16 }, // TBS_UPD
@@ -246,7 +246,7 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     { 0x14, 1600, 32, 56 },
     { 5,    2000, 33, 60 },
     { 0x15, 2500, 34, 65 }, // D1
-    // { 0x16, 3000, 35, 70 }, // AKK8/5/3; TBS 3W
+    { 0x16, 3000, 35, 70 }, // AKK8/5/3; TBS 3W
     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
 
@@ -343,8 +343,13 @@ bool AP_VideoTX::init(void)
         initPowerLevels(2500, {25, 500, 1000, 2500});
         break;
     case Model::TBS_UPD:
-        _max_power_mw.set_and_save(1000);
         initPowerLevels(1000, {10, 25, 100, 200, 500, 1000});  // 400
+        break;
+    case Model::D1_P3:
+        initPowerLevels(2500, {25, 1000, 2500});
+        break;
+    case Model::TBS_UPD_P3:
+        initPowerLevels(3000, {25, 1000, 3000});
         break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {
@@ -564,7 +569,7 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     // Get custom mW by the value, use approximate value if the exact one has not been found
     auto cmw = [this](uint16_t val) {
         uint8_t i = 0;
-        for (; i < VTX_MAX_ADJUSTABLE_POWER_LEVELS && _power_vals[i].val <= val; ++i)
+        for (; i < _num_active_levels && _power_vals[i].val <= val; ++i)
             if (val == _power_vals[i].val)
                 return _power_vals[i].mw;
         if (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw)
@@ -576,7 +581,7 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     && _power_levels[_current_power].active == active)
         return;
 
-    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_ADJUSTABLE_POWER_LEVELS; ++i) {
+    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < _num_active_levels; ++i) {
         if (_power_levels[i].mw == _power_vals[j].mw) {
             if (power == _power_vals[j].val) {
                 _current_power = i;
@@ -590,7 +595,7 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
 
 uint16_t AP_VideoTX::get_configured_power_val() const
 {
-     for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && _power_vals[i].mw <= _power_mw; ++i)
+     for(uint8_t i = 0; i < _num_active_levels && _power_vals[i].mw <= _power_mw; ++i)  // VTX_MAX_ADJUSTABLE_POWER_LEVELS
         if(_power_vals[i].mw == _power_mw)
             return _power_vals[i].val;
     return 0;

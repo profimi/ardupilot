@@ -9,7 +9,9 @@ constexpr uint8_t BAND_CHANNELS_NUM = 8;  // The [maximal] number of channels in
 enum class Model: uint8_t {
     GENERIC = 0,
     D1 = 1,  // D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1
-    TBS_UPD = 2,  // TBS Unify Pro32 DP
+    TBS_UPD = 2,  // TBS Unify Pro32 DP (official with 1W max power)
+    D1_P3 = 3,  // D1 having 3 power channels; D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1 (25/1000/2500 mW)
+    TBS_UPD_P3 = 4,  // TBS Unify Pro32 DP having 3 power channels (25/1000/3000 mW)
     CUSTOM = 9  // 6 custom power values
 };
 

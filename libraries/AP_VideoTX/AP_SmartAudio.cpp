@@ -262,13 +262,14 @@ void AP_SmartAudio::update_vtx_params()
             debug("update power (ver %d.%d)", ver_high(_protocol_version), ver_low(_protocol_version));
             switch (_protocol_version) {
             case SMARTAUDIO_SPEC_PROTOCOL_v21:
+                // Note: MSB (0x80) indicates to interpret Power Value in dBm rather than power index in the internal power table
                 set_power(0x80 | (vtx.model() != AP_VideoTX::Model::CUSTOM
                     ? vtx.get_configured_power_dbm() : vtx.get_configured_power_val()));
                 break;
             case SMARTAUDIO_SPEC_PROTOCOL_v2:
                 if(vtx.model() != AP_VideoTX::Model::CUSTOM)
                     set_power(vtx.get_configured_power_level());
-                else set_power(vtx.get_configured_power_val());
+                else set_power(vtx.get_configured_power_val());  // Level index in the internal power table is used
                 break;
             default:    // v1
                 if(vtx.model() != AP_VideoTX::Model::CUSTOM) {
