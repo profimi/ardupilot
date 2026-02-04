@@ -97,6 +97,11 @@ public:
 
     // set and save trim if changed
     void       set_and_save_radio_trim(int16_t val) { radio_trim.set_and_save_ifchanged(val);}
+    
+    /// @brief Sets the number of positions n for the npos switch
+    /// @param levs  - the number of levels (positions): 2 .. 8, default: 6
+    /// @return whether the value is update or ignored being out of the acceptable range
+    bool       set_npos_switch_levels(uint8_t levs);
 
     // check if any of the trim/min/max param are configured, this would indicate that the user has done a calibration at somepoint
     bool       configured() { return radio_min.configured() || radio_max.configured() || radio_trim.configured(); }
@@ -391,12 +396,11 @@ protected:
 
 
 private:
-
     // pwm is stored here
     int16_t     radio_in;
 
     // value generated from PWM normalised to configured scale
-    int16_t    control_in;
+    int16_t     control_in;
 
     AP_Int16    radio_min;
     AP_Int16    radio_trim;
@@ -411,6 +415,8 @@ private:
     // the input channel this corresponds to
     uint8_t     ch_in;
 
+    uint8_t     npos_levs;  // The number of positions (levels) in npos switch: 2 .. 8
+
     // overrides
     uint16_t override_value;
     uint32_t last_override_time;
@@ -423,6 +429,7 @@ private:
 
     bool read_3pos_switch(AuxSwitchPos &ret) const WARN_IF_UNUSED;
     bool read_6pos_switch(int8_t& position) WARN_IF_UNUSED;
+    bool read_npos_switch(int8_t& position) WARN_IF_UNUSED;  // Applied to set VTX power levels and others
 
     // Structure used to detect and debounce switch changes
     struct {

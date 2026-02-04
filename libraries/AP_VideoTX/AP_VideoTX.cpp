@@ -287,6 +287,8 @@ AP_VideoTX::AP_VideoTX()
     singleton = this;
 
     AP_Param::setup_object_defaults(this, var_info);
+    // Postprocess set values
+    syncActiveLevs(_num_active_levels);
 }
 
 AP_VideoTX::~AP_VideoTX(void)
@@ -304,7 +306,7 @@ bool AP_VideoTX::init(void)
 
     // Correct static tables to match object parameters
     if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
-        _num_active_levels.set_and_save(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
+        syncActiveLevs(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
 
     /*! @brief Power levels initialization
     * @param[in] pwrMax  - the number of power levels
@@ -315,7 +317,7 @@ bool AP_VideoTX::init(void)
     auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws, bool doEnum=true)
     {
         _max_power_mw.set_and_save(pwrMax);
-        _num_active_levels.set_and_save(mws.size());
+        syncActiveLevs(mws.size());
         uint8_t i = 0, n = 0;
         for(auto mw: mws) {
             for(; i < VTX_MAX_POWER_LEVELS; ++i) {
@@ -387,6 +389,23 @@ bool AP_VideoTX::init(void)
     _initialized = true;
 
     return true;
+}
+
+bool AP_VideoTX::syncActiveLevs(uint8_t num)
+{
+    // Set respective npos switch to this number of positions
+    // Find_channel_for_option() returns a pointer to the assigned RC_Channel
+    bool res = false;
+    RC_Channel *chan = rc().find_channel_for_option(RC_Channel::AUX_FUNC::VTX_POWER);
+    if (chan != nullptr) {
+        // // Use chan->ch() to get the 1-indexed channel number (e.g., 9 for RC9)
+        // uint8_t channel_num = chan->ch();
+        res = chan->set_npos_switch_levels(num);
+    } else GCS_SEND_TEXT(MAV_SEVERITY_INFO, "No RC channel assigned to VTX Power");
+    if (res)
+        _num_active_levels.set_and_save(num);
+    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "The number of active ");
+    return res;
 }
 
 bool AP_VideoTX::get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel) const

@@ -199,6 +199,9 @@ public:
     static AP_VideoTX *singleton;
 
 private:
+    /// Set the number of active power levels and sync that the respective RC Channel's npos switch with that value
+    bool syncActiveLevs(uint8_t num);
+
     uint8_t find_current_power() const;
     // channel frequency
     AP_Int16 _frequency_mhz;
@@ -234,7 +237,7 @@ private:
     AP_Int8  _user_freq;
 
     // The number of active power levels of VTX
-    AP_Int8 _num_active_levels;
+    AP_Int8 _num_active_levels;  // ATTENTION: it should be synced with the RC_Channel::read_6pos_switch / read_npos_switch
 
     // Custom VTX values and labels (mW)
     AP_Int16 _cvals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];

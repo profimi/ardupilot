@@ -94,6 +94,15 @@ inline bool is_negative(const double fVal1) {
 }
 
 /*
+ * @brief: Rounded division of integral values
+ */
+template <typename T>
+inline T round_div(T a, T b) {
+    static_assert(std::is_integral<T>::value, "Template parameter not of integral type");
+    return a/b + ((a - a/b*b) << 1)/b;
+}
+
+/*
  * A variant of asin() that checks the input ranges and ensures a valid angle
  * as output. If nan is given as input then zero is returned.
  */
