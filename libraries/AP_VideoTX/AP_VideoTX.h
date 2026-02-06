@@ -22,7 +22,8 @@
 #include <AP_Param/AP_Param.h>
 
 using VTX::BAND_CHANNELS_NUM;  // VTX_MAX_CHANNELS = 8;
-constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7, typically 5-6
+// ATTENTION: VTX_MAX_ADJUSTABLE_POWER_LEVELS corresponds to the the predefined parameters PRESETn power levels (see AP_VideoTX.cpp)
+constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7, typically 5-6; possible 2..8 to be synced with RC_Channel::read_npos_switch; Defines the number of VTX PRESET power levs
 extern const uint8_t VTX_MAX_POWER_LEVELS;  // = 19;
 
 class AP_VideoTX {
@@ -228,7 +229,7 @@ private:
     bool _current_enabled;
 
     // Preset block:  BBC (band 0..15 and channel 0..7)
-    AP_Int16  _preset[6];
+    AP_Int16  _preset[6];  // ATTENTION: 6 values are used because they are bound to 6po switch in RC_Channel::read_aux()
 
     // VTX model
     AP_Int8  _model;

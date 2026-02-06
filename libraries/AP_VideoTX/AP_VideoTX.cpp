@@ -124,9 +124,9 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
 
     // @Param: POW_LEVELS
     // @DisplayName: Power level count
-    // @Description: How many proper power levels has been configured, < VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6
+    // @Description: How many proper power levels has been configured, <= VTX_MAX_ADJUSTABLE_POWER_LEVELS <= 8 (max npos switch values)
     // @Range: 0 VTX_MAX_ADJUSTABLE_POWER_LEVELS
-    AP_GROUPINFO("POW_LEVELS", 15, AP_VideoTX, _num_active_levels, 6),
+    AP_GROUPINFO("POW_LEVELS", 15, AP_VideoTX, _num_active_levels, 6),  // 6 to use 6pos or rotational switch
 
     // @Param: POW_CVAL1
     // @DisplayName: VTX custom power value
@@ -251,6 +251,7 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
 };
 
 const uint8_t VTX_MAX_POWER_LEVELS = sizeof(AP_VideoTX::_power_levels) / sizeof(AP_VideoTX::_power_levels[0]);
+static_assert(VTX_MAX_POWER_LEVELS >= VTX_MAX_ADJUSTABLE_POWER_LEVELS, "VTX_MAX_ADJUSTABLE_POWER_LEVELS is out of range");
 
 // D1 => _num_active_levels = 4:  25, 500, 1000, 2500; _max_power_mw = 2500
 // FXR10 => _num_active_levels = 5 (6):  500, 2500, 5000, 7500, 10000; _max_power_mw = 10000
@@ -287,8 +288,6 @@ AP_VideoTX::AP_VideoTX()
     singleton = this;
 
     AP_Param::setup_object_defaults(this, var_info);
-    // Postprocess set values
-    syncActiveLevs(_num_active_levels);
 }
 
 AP_VideoTX::~AP_VideoTX(void)
@@ -305,8 +304,9 @@ bool AP_VideoTX::init(void)
     _options.convert_parameter_width(AP_PARAM_INT16);
 
     // Correct static tables to match object parameters
-    if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
-        syncActiveLevs(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
+    // And sync RC_Channel::read_npos_switch levels with _num_active_levels
+    syncActiveLevs(_num_active_levels > VTX_MAX_ADJUSTABLE_POWER_LEVELS
+        ? VTX_MAX_ADJUSTABLE_POWER_LEVELS : _num_active_levels);
 
     /*! @brief Power levels initialization
     * @param[in] pwrMax  - the number of power levels
@@ -404,7 +404,7 @@ bool AP_VideoTX::syncActiveLevs(uint8_t num)
     } else GCS_SEND_TEXT(MAV_SEVERITY_INFO, "No RC channel assigned to VTX Power");
     if (res)
         _num_active_levels.set_and_save(num);
-    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "The number of active ");
+    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "VTX power levels count != npos switch levels");
     return res;
 }
 
@@ -614,7 +614,8 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
 
 uint16_t AP_VideoTX::get_configured_power_val() const
 {
-     for(uint8_t i = 0; i < _num_active_levels && _power_vals[i].mw <= _power_mw; ++i)  // VTX_MAX_ADJUSTABLE_POWER_LEVELS
+    // Note: _num_active_levels <= VTX_MAX_ADJUSTABLE_POWER_LEVELS
+    for(uint8_t i = 0; i < _num_active_levels && _power_vals[i].mw <= _power_mw; ++i)
         if(_power_vals[i].mw == _power_mw)
             return _power_vals[i].val;
     return 0;
@@ -811,8 +812,11 @@ void AP_VideoTX::change_power(int8_t position)
             num_active_levels++;
         }
     }
-    // iterate through to find the level
-    uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / float(_num_active_levels)) - 1), 0, num_active_levels - 1);
+    // Iterate through to find the level
+    // The level mapping is necessary only when num_active_levels != positions (6 for 6pos switch)
+    // const uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / 6.f) - 1), 0, num_active_levels - 1);
+    // const uint16_t level = round_div(num_active_levels * (position + 1), 6) - 1;
+    const uint16_t level = position;
     debug("looking for pos %d power level %d from %d", position, level, num_active_levels);
     uint16_t power = 0;
     for (uint8_t i = 0, j = 0; i < num_active_levels; ++i, ++j) {

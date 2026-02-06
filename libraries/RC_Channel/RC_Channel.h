@@ -415,7 +415,7 @@ private:
     // the input channel this corresponds to
     uint8_t     ch_in;
 
-    uint8_t     npos_levs;  // The number of positions (levels) in npos switch: 2 .. 8
+    uint8_t     npos_levs;  // The number of positions (levels) in npos switch per RC channel: 2 .. 8
 
     // overrides
     uint16_t override_value;
