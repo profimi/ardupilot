@@ -14,6 +14,7 @@ enum class Model: uint8_t {
     TBS_UPD = 2,  // TBS Unify Pro32 DP (official with 1W max power); 6 power levels
     D1_P3 = 3,  // D1 reduced to 3 power levels; D1 accepts power values in DBM for both IRC Tramp and SmartAudio 2.1 (25/1000/2500 mW)
     TBS_UPD_P3 = 4,  // TBS Unify Pro32 DP reduced to 3 power levels (25/1000/3000 mW)
+    TBS_UPD3 = 5,  // TBS Unify Pro32 DP 3W; 6 power levels (25, 100, 200, 500, 1000, 3000 mW)
     CUSTOM = 9  // 6 custom custom power values (dBm/mW/etc)
 };
 

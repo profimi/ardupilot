@@ -334,6 +334,11 @@ bool AP_VideoTX::init(void)
                 }
             }
         }
+        // Invalidate the remained levels
+        for(; i < VTX_MAX_POWER_LEVELS; ++i) {
+            _power_levels[i].active = PowerActive::Inactive;
+            _power_levels[i].level = 0xFF;  // Invalidate the power level
+        }
     };
 
     // Init freqMap with the actual parameters
@@ -352,6 +357,9 @@ bool AP_VideoTX::init(void)
         break;
     case Model::TBS_UPD_P3:
         initPowerLevels(3000, {25, 1000, 3000});
+        break;
+    case Model::TBS_UPD3:
+        initPowerLevels(3000, {25, 100, 200, 500, 1000, 3000});  // 25, 100, 200, 400, 1000, 3000
         break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {
@@ -480,7 +488,7 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t 
 {
     if(i >= VTX_MAX_POWER_LEVELS)
         i = 0;
-    for (; i < VTX_MAX_POWER_LEVELS && power <= _power_levels[i].dbm; ++i) {
+    for (; i < VTX_MAX_POWER_LEVELS && _power_levels[i].dbm <= power; ++i) {
         if (power == _power_levels[i].dbm) {
             if (_power_levels[i].active != active) {
                 _power_levels[i].active = active;
@@ -489,12 +497,13 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t 
             return i;
         }
     }
-    // Insert new power levels if necessary, moving the previous value to the reserved custom slot
+    // Insert new power levels if necessary
     if(i < VTX_MAX_POWER_LEVELS) {
-        if(i < VTX_MAX_POWER_LEVELS-1)
-            _power_levels[VTX_MAX_POWER_LEVELS-1] = _power_levels[i];
+        // Move the previous value to the reserved custom slot; However that invalidates the ordering
+        // if(i < VTX_MAX_POWER_LEVELS-1)
+        //     _power_levels[VTX_MAX_POWER_LEVELS-1] = _power_levels[i];
         _power_levels[i].dbm = power;
-        _power_levels[i].level = 0xFF;
+        // _power_levels[i].level = 0xFF;  // Retain the level number
         _power_levels[i].dac = 0xFF;
         _power_levels[i].mw = uint16_t(roundf(powf(10, power * 0.1f)));
         _power_levels[i].active = active;
@@ -591,7 +600,7 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
         for (; i < _num_active_levels && _power_vals[i].val <= val; ++i)
             if (val == _power_vals[i].val)
                 return _power_vals[i].mw;
-        if (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw)
+        if (i >= _num_active_levels || (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw))
             --i;
         return _power_vals[i].mw;
     };
@@ -600,15 +609,15 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     && _power_levels[_current_power].active == active)
         return;
 
-    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < _num_active_levels; ++i) {
-        if (_power_levels[i].mw == _power_vals[j].mw) {
+    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < _num_active_levels;) {
+        if (_power_levels[i].mw >= _power_vals[j].mw) {
             if (power == _power_vals[j].val) {
                 _current_power = i;
                 _power_levels[i].active = active;
                 debug("learned power %dmw", get_power_mw());
                 break;
             } else ++j;
-        }
+        } else ++i;
     }
 }
 
@@ -807,16 +816,18 @@ void AP_VideoTX::change_power(int8_t position)
 
     // first find out how many possible levels there are
     uint8_t num_active_levels = 0;
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (_power_levels[i].active != PowerActive::Inactive && _power_levels[i].mw <= _max_power_mw) {
-            num_active_levels++;
-        }
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++)
+        if (_power_levels[i].active != PowerActive::Inactive && _power_levels[i].mw <= _max_power_mw)
+            ++num_active_levels;
+    if(num_active_levels > _num_active_levels) {
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The actual number of power levels (%u) > _num_active_levels (%u)", num_active_levels, uint8_t(_num_active_levels));
+        // num_active_levels = _num_active_levels;
     }
     // Iterate through to find the level
     // The level mapping is necessary only when num_active_levels != positions (6 for 6pos switch)
     // const uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / 6.f) - 1), 0, num_active_levels - 1);
-    // const uint16_t level = round_div(num_active_levels * (position + 1), 6) - 1;
-    const uint16_t level = position;
+    const uint16_t level = round_div<uint8_t>(num_active_levels * (position + 1), _num_active_levels) - 1;
+    // const uint16_t level = position;
     debug("looking for pos %d power level %d from %d", position, level, num_active_levels);
     uint16_t power = 0;
     for (uint8_t i = 0, j = 0; i < num_active_levels; ++i, ++j) {
@@ -824,7 +835,7 @@ void AP_VideoTX::change_power(int8_t position)
             ++j;
         if (i == level) {
             if(j >= VTX_MAX_POWER_LEVELS) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The number of actual active levels (%u) < num_active_levels (%u)", i, num_active_levels);
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The actual number of active levels (%u) < num_active_levels (%u)", i, num_active_levels);
                 return;
             }
             power = _power_levels[j].mw;
@@ -835,13 +846,12 @@ void AP_VideoTX::change_power(int8_t position)
 
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX pwr: %u mw #%u", power, position);
     if (power == 0) {
-        // NOTE: We might intentionally want to turn off VTX to reduce/hide our radio profile unil moving to some further location
-        // if (!hal.util->get_soft_armed())    // don't allow pitmode to be entered if already armed
+        // NOTE: We might intentionally want to turn off VTX to reduce RF emissions temporary
+        // if (!hal.util->get_soft_armed())    // Don't allow pitmode to be entered if already armed
             set_configured_options(get_configured_options() | uint8_t(VideoOptions::VTX_PITMODE));
     } else {
-        if (has_option(VideoOptions::VTX_PITMODE)) {
+        if (has_option(VideoOptions::VTX_PITMODE))
             set_configured_options(get_configured_options() & ~uint8_t(VideoOptions::VTX_PITMODE));
-        }
         set_configured_power_mw(power);
     }
 }
