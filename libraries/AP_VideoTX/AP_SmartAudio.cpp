@@ -570,8 +570,10 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
     // SA21 sends us a complete packet with the supported power levels
     if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v21) {
         vtx.set_power_dbm(settings.power_in_dbm);
-        // learn them all
-        vtx.update_all_power_dbm(settings.num_power_levels, settings.power_levels);
+        // Learn them all for the Generic model; other VTX models are already initialized
+        if(vtx.model() == AP_VideoTX::Model::GENERIC)
+            vtx.update_all_power_dbm(settings.num_power_levels, settings.power_levels);
+        else vtx.validate_active_power_dbm(settings.num_power_levels, settings.power_levels);
     } else if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v2) {
         vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
         // learn them all if have not been initialized yet - it's not possible to know the mw values in v2.0 so just have to go from the spec
