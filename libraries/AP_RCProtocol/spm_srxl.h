@@ -150,11 +150,7 @@ typedef enum
 } SRXL_CMD;
 
 // // VTX Band (see AP_VideoTX::VIDEO_CHANNELS/frequency_map in libraries\AP_VideoTX\AP_VideoTX.cpp)
-// #define VTX_BAND_FATSHARK   (0)
-// #define VTX_BAND_RACEBAND   (1)
-// #define VTX_BAND_E_BAND     (2)
-// #define VTX_BAND_B_BAND     (3)
-// #define VTX_BAND_A_BAND     (4)
+// See libraries/AP_VideoTX/AP_VideoTX_freqs.cpp
 //
 // // VTX Pit Mode
 // #define VTX_MODE_RACE   (0)
@@ -281,7 +277,7 @@ typedef struct SrxlParamPacket
 // VTX Data
 typedef struct SrxlVtxData
 {
-    uint8_t band;       // VTX Band (0 = Fatshark, 1 = Raceband, 2 = E, 3 = B, 4 = A)
+    uint8_t band;       // VTX Band (see AP_VideoTX_freqs.h)
     uint8_t channel;    // VTX Channel (0-7)
     uint8_t pit;        // Pit/Race mode (0 = Race, 1 = Pit). Race = normal power, Pit = reduced power
     uint8_t power;      // VTX Power (0 = Off, 1 = 1mw to 14mW, 2 = 15mW to 25mW, 3 = 26mW to 99mW,

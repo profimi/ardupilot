@@ -1,0 +1,34 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pexpect = "*"
+future = "*"
+lxml = "*"
+pymavlink = "*"
+pyserial = "*"
+mavproxy = "*"
+geocoder = "*"
+empy = "*"
+ptyprocess = "*"
+dronecan = "*"
+flake8 = "*"
+junitparser = "*"
+wsproto = "*"
+tabulate = "*"
+pygame = "*"
+intelhex = "*"
+matplotlib = "*"
+scipy = "*"
+opencv-python = "*"
+pyyaml = "*"
+# Ardupilot 4.6.2+ requires: empy==3.3.4
+setuptools = "*"
+
+[dev-packages]
+littlefs-python = "*"
+
+[requires]
+python_version = "3.13"

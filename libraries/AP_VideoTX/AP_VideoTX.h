@@ -22,7 +22,9 @@
 #include <AP_Param/AP_Param.h>
 
 using VTX::BAND_CHANNELS_NUM;  // VTX_MAX_CHANNELS = 8;
-constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 7, typically 5-6
+// ATTENTION: VTX_MAX_ADJUSTABLE_POWER_LEVELS corresponds to the the predefined parameters PRESETn power levels (see AP_VideoTX.cpp)
+// Note? libraries/AP_VideoTX/AP_SmartAudio.h: Settings supports up to 8 power levels
+constexpr uint8_t VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6;  // <= 8, typically 5-6; possible 2..8 to be synced with RC_Channel::read_npos_switch; Defines the number of VTX PRESET power levs
 extern const uint8_t VTX_MAX_POWER_LEVELS;  // = 19;
 
 class AP_VideoTX {
@@ -107,16 +109,19 @@ public:
     void set_power_mw(uint16_t power);
     void set_power_level(uint8_t level, PowerActive active=PowerActive::Active);
 
-    /*! @brief Set the power in dBm and update power levels
-    * 
-    * @param[in] power  - power in dBm
-    * @param[in] active  - active state of the power level
-    */
+    /// @brief Set the power in dBm and update power levels
+    /// @param[in] power  - power in dBm
+    /// @param[in] active  - active state of the power level
     void set_power_dbm(uint8_t power, PowerActive active=PowerActive::Active);
     void set_power_dac(uint16_t power, PowerActive active=PowerActive::Active);
     // add a new dbm setting to those supported, i is the starting index
     uint8_t update_power_dbm(uint8_t power, PowerActive active=PowerActive::Active, uint8_t i=0);
     void update_all_power_dbm(uint8_t nlevels, const uint8_t levels[]);
+    /// @brief Validate predefined VTX power levels with the actual ones provided by the hardware
+    /// This routine is called by SmartAudio v2.1 and newer protocols
+    /// @param[in] nlevels  - the actual number of power levels provided by VTX
+    /// @param[in] power  - power levels provided by the VX hardware
+    void validate_active_power_dbm(uint8_t nlevels, const uint8_t power[]);
     void set_configured_power_mw(uint16_t power);
 
     //! Handle custom power value tables, considering power levels enumeration
@@ -199,6 +204,9 @@ public:
     static AP_VideoTX *singleton;
 
 private:
+    /// Set the number of active power levels and sync that the respective RC Channel's npos switch with that value
+    bool syncActiveLevs(uint8_t num);
+
     uint8_t find_current_power() const;
     // channel frequency
     AP_Int16 _frequency_mhz;
@@ -225,7 +233,7 @@ private:
     bool _current_enabled;
 
     // Preset block:  BBC (band 0..15 and channel 0..7)
-    AP_Int16  _preset[6];
+    AP_Int16  _preset[6];  // ATTENTION: 6 values are used because they are bound to 6po switch in RC_Channel::read_aux()
 
     // VTX model
     AP_Int8  _model;
@@ -234,7 +242,7 @@ private:
     AP_Int8  _user_freq;
 
     // The number of active power levels of VTX
-    AP_Int8 _num_active_levels;
+    AP_Int8 _num_active_levels;  // ATTENTION: it should be synced with the RC_Channel::read_6pos_switch / read_npos_switch
 
     // Custom VTX values and labels (mW)
     AP_Int16 _cvals[VTX_MAX_ADJUSTABLE_POWER_LEVELS];

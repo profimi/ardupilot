@@ -257,9 +257,9 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter}: 182: AHRS AutoTrim
     // @Values{Plane}: 183: AUTOLAND mode
     // @Values{Plane}: 184: System ID Chirp (Quadplane only)
-    // @Values{Copter, Rover, Plane}: 197:VTX Preset
-    // @Values{Copter, Rover, Plane}: 198:VTX Band
-    // @Values{Copter, Rover, Plane}: 199:VTX Channel
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 197:VTX Preset
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 198:VTX Band
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 199:VTX Channel
     // @Values{Rover}: 201:Roll
     // @Values{Rover}: 202:Pitch
     // @Values{Rover}: 207:MainSail
@@ -282,6 +282,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
 
 // constructor
 RC_Channel::RC_Channel(void)
+: npos_levs{6}
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -577,7 +578,7 @@ void RC_Channel::reset_mode_switch()
     read_mode_switch();
 }
 
-// read a 6 position switch
+// Read 6 position switch
 bool RC_Channel::read_6pos_switch(int8_t& position)
 {
     // calculate position of 6 pos switch
@@ -590,10 +591,41 @@ bool RC_Channel::read_6pos_switch(int8_t& position)
     // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
     // Our old: 1110, 1305, 1500, 1694, 1888
     // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    // Formal PWM range: 1000 - 2000, but can be up to 800 - 2200; Our: 888 - 2112
     constexpr uint16_t  chMarks[] = {1090, 1294, 1499, 1704, 1909};
-    constexpr uint8_t  posMax = sizeof(chMarks);
+    constexpr uint8_t  posMax = sizeof(chMarks) / sizeof(*chMarks);
     while(position < posMax && pulsewidth >= chMarks[position])
         ++position;
+
+    if (!debounce_completed(position))
+        return false;
+
+    return true;
+}
+
+bool RC_Channel::set_npos_switch_levels(uint8_t levs)
+{
+    if(levs < 2 || levs > 8)
+        return false;
+    npos_levs = levs;
+    return true;
+}
+
+// Read n position switch
+bool RC_Channel::read_npos_switch(int8_t& position)
+{
+    // calculate position of 6 pos switch
+    const uint16_t pulsewidth = get_radio_in();
+    if (pulsewidth <= RC_MIN_LIMIT_PWM || pulsewidth >= RC_MAX_LIMIT_PWM)
+        return false;  // This is an error condition
+
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    // Formal PWM range: 1000 - 2000, but can be up to 800 - 2200; Our: 888 - 2112
+    // position = static_cast<uint8_t>(round_div<uint8_t>((pulsewidth - RC_MIN_LIMIT_PWM) * npos_levs), RC_MAX_LIMIT_PWM - RC_MIN_LIMIT_PWM));
+    position = round_div((pulsewidth - RC_MIN_LIMIT_PWM) * npos_levs, RC_MAX_LIMIT_PWM - RC_MIN_LIMIT_PWM);
 
     if (!debounce_completed(position))
         return false;
@@ -969,7 +1001,7 @@ bool RC_Channel::read_aux()
 #if AP_VIDEOTX_ENABLED
     } else if (_option == AUX_FUNC::VTX_POWER) {
         int8_t position;
-        if (read_6pos_switch(position)) {
+        if (read_npos_switch(position)) {
             GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Power switch pos: %u\n", position);
             AP::vtx().change_power(position);
             return true;

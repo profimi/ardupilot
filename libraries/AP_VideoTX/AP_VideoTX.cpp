@@ -124,9 +124,10 @@ const AP_Param::GroupInfo AP_VideoTX::var_info[] = {
 
     // @Param: POW_LEVELS
     // @DisplayName: Power level count
-    // @Description: How many proper power levels has been configured, < VTX_MAX_ADJUSTABLE_POWER_LEVELS = 6
-    // @Range: 0 VTX_MAX_ADJUSTABLE_POWER_LEVELS
-    AP_GROUPINFO("POW_LEVELS", 15, AP_VideoTX, _num_active_levels, 6),
+    // @Description: How many proper power levels has been configured, <= VTX_MAX_ADJUSTABLE_POWER_LEVELS <= 8 (max npos switch values; max VTX power levels in SmartAudio 2.1)
+    // Up to VTX_MAX_ADJUSTABLE_POWER_LEVELS for Model::CUSTOM, otherwise up to 8
+    // @Range: 0 8
+    AP_GROUPINFO("POW_LEVELS", 15, AP_VideoTX, _num_active_levels, VTX_MAX_ADJUSTABLE_POWER_LEVELS),  // 6 to use 6pos or rotational switch
 
     // @Param: POW_CVAL1
     // @DisplayName: VTX custom power value
@@ -233,20 +234,20 @@ extern const AP_HAL::HAL& hal;
 AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     // level, mw, dbm, dac
     { 0x10, 0,    0, 0   }, // only in SA 2.1
-    // { 0,    10,   10, 5  }, // D1; AKK8/5/3
-    { 0,    25,   14, 7  }, // D1; AKK8/5/3
-    { 0x11, 100,  20, 10 }, // only in SA 2.1
-    { 1,    200,  23, 16 }, // AKK5
-    { 0x12, 400,  26, 20 }, // only in SA 2.1
-    { 2,    500,  27, 25 }, // D1; AKK5; Fxr10
+    // { 0,    10,   10, 5  }, // D1; AKK8/5/3; TBS_UPD
+    { 0,    25,   14, 7  }, // D1; AKK8/5/3; TBS_UPD
+    { 0x11, 100,  20, 10 }, // only in SA 2.1; TBS_UPD
+    { 1,    200,  23, 16 }, // AKK5; TBS_UPD
+    { 0x12, 400,  26, 20 }, // only in SA 2.1; TBS_UPD
+    { 2,    500,  27, 25 }, // D1; AKK5; Fxr10; TBS_UPD
     { 0x22, 600,  28, 30 },
     { 3,    800,  29, 40 },
-    { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; AKK8/5/3
+    { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; AKK8/5/3; TBS_UPD
     { 4,    1200, 31, 52 },
     { 0x14, 1600, 32, 56 },
     { 5,    2000, 33, 60 },
     { 0x15, 2500, 34, 65 }, // D1; Fxr10
-    { 0x16, 3000, 35, 70 }, // AKK8/5/3
+    { 0x16, 3000, 35, 70 }, // AKK8/5/3; TBS_UPD
     { 0x17, 5000, 37, 80 }, // AKK8/5 (AKK Ultra Long Range 5W TX5000ac 6060 Mhz); Fxr10
     { 0x18, 7500, 39, 85 }, // Fxr10 (Foxeer 4.9G~6G Reaper Infinity 10W)
     { 0x19, 8000, 39, 90 }, // AKK8 (AKK Ultra Long Range 8W TX5000ac 6060 Mhz)
@@ -255,6 +256,7 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
 };
 
 const uint8_t VTX_MAX_POWER_LEVELS = sizeof(AP_VideoTX::_power_levels) / sizeof(AP_VideoTX::_power_levels[0]);
+static_assert(VTX_MAX_POWER_LEVELS >= VTX_MAX_ADJUSTABLE_POWER_LEVELS, "VTX_MAX_ADJUSTABLE_POWER_LEVELS is out of range");
 
 // D1 => _num_active_levels = 4:  25, 500, 1000, 2500; _max_power_mw = 2500
 // FXR10 => _num_active_levels = 5 (6):  500, 2500, 5000, 7500, 10000; _max_power_mw = 10000
@@ -282,6 +284,12 @@ const uint8_t VTX_MAX_POWER_LEVELS = sizeof(AP_VideoTX::_power_levels) / sizeof(
 //     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 // };
 
+/// Convert Power in dBm to mW
+inline uint16_t dbm_to_mw(uint8_t dbm)
+{
+    return roundf(powf(10, dbm * 0.1f));
+}
+
 AP_VideoTX::AP_VideoTX()
 {
     if (singleton) {
@@ -307,19 +315,22 @@ bool AP_VideoTX::init(void)
     _options.convert_parameter_width(AP_PARAM_INT16);
 
     // Correct static tables to match object parameters
-    if(_num_active_levels >= VTX_MAX_ADJUSTABLE_POWER_LEVELS)
-        _num_active_levels.set_and_save(VTX_MAX_ADJUSTABLE_POWER_LEVELS);
+    // And sync RC_Channel::read_npos_switch levels with _num_active_levels
+    if(_num_active_levels > 8) {  // Note: SmartAudio v2.1 Settings in Ardupilot defines up to 8 power levels
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "_num_active_levels = %u is out of range, adjusting to max: 8", uint8_t(_num_active_levels));
+        _num_active_levels.set_and_save(8);
+    }
+    syncActiveLevs(model() == AP_VideoTX::Model::CUSTOM && _num_active_levels > VTX_MAX_ADJUSTABLE_POWER_LEVELS
+        ? VTX_MAX_ADJUSTABLE_POWER_LEVELS : _num_active_levels);
 
-    /*! @brief Power levels initialization
-    * @param[in] pwrMax  - the number of power levels
-    * @param[in] mws  - milli Watt values
-    * @param[in] doEnum  - whether to reset and enumerate the level values corresponding to those power values,
-    *   which is essential for SmartAudio 2.0
-    */
+    /// @brief Power levels initialization
+    /// @param[in] pwrMax  - the number of power levels
+    /// @param[in] mws  - milli Watt values
+    /// @param[in] doEnum  - whether to reset and enumerate the level values corresponding to those power values, which is essential for SmartAudio 2.0
     auto initPowerLevels = [this](uint16_t pwrMax, std::initializer_list<uint16_t>&& mws, bool doEnum=true)
     {
         _max_power_mw.set_and_save(pwrMax);
-        _num_active_levels.set_and_save(mws.size());
+        syncActiveLevs(mws.size());
         uint8_t i = 0, n = 0;
         for(auto mw: mws) {
             for(; i < VTX_MAX_POWER_LEVELS; ++i) {
@@ -335,6 +346,11 @@ bool AP_VideoTX::init(void)
                     break;
                 }
             }
+        }
+        // Invalidate the remained levels
+        for(; i < VTX_MAX_POWER_LEVELS; ++i) {
+            _power_levels[i].active = PowerActive::Inactive;
+            _power_levels[i].level = 0xFF;  // Invalidate the power level
         }
     };
 
@@ -364,6 +380,15 @@ bool AP_VideoTX::init(void)
     case Model::AKK8:
         initPowerLevels(8000, {25, 1000, 3000, 5000, 8000}, true);
         break;
+    case Model::TBS_UPD:
+        initPowerLevels(1000, {10, 25, 100, 200, 500, 1000});  // 400
+        break;
+    case Model::TBS_UPD3:
+        initPowerLevels(3000, {25, 100, 200, 500, 1000, 3000});  // 25, 100, 200, 400, 1000, 3000; Note: shows 2W, but actually emits 3-3.5W
+        break;
+    // case Model::D1_P3:
+    //     initPowerLevels(2500, {25, 1000, 2500});
+    //     break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {
             _power_vals[i].val = _cvals[i];
@@ -400,6 +425,23 @@ bool AP_VideoTX::init(void)
     _initialized = true;
 
     return true;
+}
+
+bool AP_VideoTX::syncActiveLevs(uint8_t num)
+{
+    // Set respective npos switch to this number of positions
+    // Find_channel_for_option() returns a pointer to the assigned RC_Channel
+    bool res = false;
+    RC_Channel *chan = rc().find_channel_for_option(RC_Channel::AUX_FUNC::VTX_POWER);
+    if (chan != nullptr) {
+        // // Use chan->ch() to get the 1-indexed channel number (e.g., 9 for RC9)
+        // uint8_t channel_num = chan->ch();
+        res = chan->set_npos_switch_levels(num);
+    } else GCS_SEND_TEXT(MAV_SEVERITY_INFO, "No RC channel assigned to VTX Power");
+    if (res)
+        _num_active_levels.set_and_save(num);
+    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "VTX power levels count (%u) != npos switch levels (2..8)", num);
+    return res;
 }
 
 bool AP_VideoTX::get_band_and_channel(uint16_t freq, VideoBand& band, uint8_t& channel) const
@@ -457,14 +499,6 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
         return;
     }
 
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (power == _power_levels[i].dbm) {
-            _current_power = i;
-            _power_levels[i].active = active;
-            debug("learned power %ddbm", power);
-            return;
-        }
-    }
     // learn the non-standard power
     _current_power = update_power_dbm(power, active);
 }
@@ -473,27 +507,28 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
 uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t i)
 {
     if(i >= VTX_MAX_POWER_LEVELS)
-        i = 0;
-    for (; i < VTX_MAX_POWER_LEVELS && power <= _power_levels[i].dbm; ++i) {
-        if (power == _power_levels[i].dbm) {
-            if (_power_levels[i].active != active) {
-                _power_levels[i].active = active;
-                debug("%s power %ddbm", active == PowerActive::Active ? "learned" : "invalidated", power);
-            }
-            return i;
+        i = VTX_MAX_POWER_LEVELS - 1;
+    while(i < VTX_MAX_POWER_LEVELS && _power_levels[i].dbm < power)
+        ++i;
+    if(i < VTX_MAX_POWER_LEVELS && power == _power_levels[i].dbm) {
+        if (_power_levels[i].active != active) {
+            _power_levels[i].active = active;
+            debug("%s power %d dBm", active == PowerActive::Active ? "Learned" : "Invalidated", power);
         }
+        return i;
     }
-    // Insert new power levels if necessary, moving the previous value to the reserved custom slot
-    if(i < VTX_MAX_POWER_LEVELS) {
-        if(i < VTX_MAX_POWER_LEVELS-1)
-            _power_levels[VTX_MAX_POWER_LEVELS-1] = _power_levels[i];
-        _power_levels[i].dbm = power;
-        _power_levels[i].level = 0xFF;
-        _power_levels[i].dac = 0xFF;
-        _power_levels[i].mw = uint16_t(roundf(powf(10, power * 0.1f)));
-        _power_levels[i].active = active;
-        debug("non-standard power %ddbm -> %dmw", power, _power_levels[i].mw);
-    }
+    // Insert new power level, replacing the existing one and ensuring the power level index is always valid
+    if(i >= VTX_MAX_POWER_LEVELS)
+        i = VTX_MAX_POWER_LEVELS - 1;
+    // Move the previous value to the reserved custom slot; However that invalidates the ordering
+    // if(i < VTX_MAX_POWER_LEVELS-1)
+    //     _power_levels[VTX_MAX_POWER_LEVELS-1] = _power_levels[i];
+    _power_levels[i].dbm = power;
+    // _power_levels[i].level = 0xFF;  // Retain the level number
+    _power_levels[i].dac = 0xFF;
+    _power_levels[i].mw = dbm_to_mw(power);
+    _power_levels[i].active = active;
+    debug("non-standard power %d dbm: %d mw", power, _power_levels[i].mw);
     return i;
 }
 
@@ -512,6 +547,46 @@ void AP_VideoTX::update_all_power_dbm(uint8_t nlevels, const uint8_t power[])
             _power_levels[i].active = PowerActive::Inactive;
             _power_levels[i].level = 0xFF;
         }
+    // Sync the actual number of active power levels
+    syncActiveLevs(nlevels);
+}
+
+void AP_VideoTX::validate_active_power_dbm(uint8_t nlevels, const uint8_t power[])
+{
+    uint8_t  lastActive = VTX_MAX_POWER_LEVELS;  // Last analyzed active power level
+    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < nlevels; ++i) {
+        if (_power_levels[i].active != PowerActive::Active)
+            continue;
+        while(j < nlevels && power[j] < _power_levels[i].dbm)
+            ++j;
+        if(j >= nlevels) {
+            // Correct the remaining power levels to the last actual power level or invalidate the remaining and call syncActiveLevs().
+            // Otherwise, that would change the number of active power levels and affect their switching by potentially
+            // mapping several switch positions to a single level instead of mapping the ending positions to the max value.
+            // Here, already valid VTX input model is expected, so the first options is preferable and likely.
+            for(; i < VTX_MAX_POWER_LEVELS; ++i)
+                if (_power_levels[i].active == PowerActive::Active) {
+                    // _power_levels[i].active = PowerActive::Inactive;
+                    GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Corrected power %u -> %u dBm", _power_levels[i].dbm, power[nlevels - 1]);
+                    _power_levels[i].dbm = power[nlevels - 1];
+                    // _power_levels[i].level = 0xFF;  // Retain the level number
+                    _power_levels[i].dac = 0xFF;
+                    _power_levels[i].mw = dbm_to_mw(power[nlevels - 1]);
+                }
+            break;
+        }
+        if(power[j] == _power_levels[i].dbm) {
+            lastActive = i;
+            continue;
+        }
+        // Correct the predefine power level that is not supported by the VTX to the supported one
+        if(lastActive < VTX_MAX_POWER_LEVELS && j >= 1 && _power_levels[lastActive].dbm < power[j-1]  // power[j-1] has not been activated
+        && _power_levels[i].dbm - power[j-1] < power[j] - _power_levels[i].dbm)
+            --j;
+        GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Corrected power %u -> %u dBm",  _power_levels[i].dbm, power[j]);
+        _power_levels[i].dbm = power[j];
+        lastActive = i;
+    }
 }
 
 // set the power in mw
@@ -582,10 +657,10 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     // Get custom mW by the value, use approximate value if the exact one has not been found
     auto cmw = [this](uint16_t val) {
         uint8_t i = 0;
-        for (; i < VTX_MAX_ADJUSTABLE_POWER_LEVELS && _power_vals[i].val <= val; ++i)
-            if (val == _power_vals[i].val)
-                return _power_vals[i].mw;
-        if (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw)
+        while(i < _num_active_levels && _power_vals[i].val < val)
+            ++i;
+        if (i >= _num_active_levels || (val != _power_vals[i].val && i > 0
+        && _power_vals[i].mw - val > val - _power_vals[i-1].mw))
             --i;
         return _power_vals[i].mw;
     };
@@ -594,21 +669,25 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     && _power_levels[_current_power].active == active)
         return;
 
-    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < VTX_MAX_ADJUSTABLE_POWER_LEVELS; ++i) {
-        if (_power_levels[i].mw == _power_vals[j].mw) {
-            if (power == _power_vals[j].val) {
-                _current_power = i;
-                _power_levels[i].active = active;
-                debug("learned power %dmw", get_power_mw());
-                break;
-            } else ++j;
+    for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < _num_active_levels;) {
+        if (_power_levels[i].mw < _power_vals[j].mw) {
+            ++i;
+            continue;
         }
+        if (power == _power_vals[j].val) {
+            _current_power = i;
+            _power_levels[i].active = active;
+            debug("learned power %dmw", get_power_mw());
+            break;
+        }
+        ++j;
     }
 }
 
 uint16_t AP_VideoTX::get_configured_power_val() const
 {
-     for(uint8_t i = 0; i < VTX_MAX_POWER_LEVELS && _power_vals[i].mw <= _power_mw; ++i)
+    // Note: _num_active_levels <= VTX_MAX_ADJUSTABLE_POWER_LEVELS
+    for(uint8_t i = 0; i < _num_active_levels && _power_vals[i].mw <= _power_mw; ++i)
         if(_power_vals[i].mw == _power_mw)
             return _power_vals[i].val;
     return 0;
@@ -800,13 +879,18 @@ void AP_VideoTX::change_power(int8_t position)
 
     // first find out how many possible levels there are
     uint8_t num_active_levels = 0;
-    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++) {
-        if (_power_levels[i].active != PowerActive::Inactive && _power_levels[i].mw <= _max_power_mw) {
-            num_active_levels++;
-        }
+    for (uint8_t i = 0; i < VTX_MAX_POWER_LEVELS; i++)
+        if (_power_levels[i].active != PowerActive::Inactive && _power_levels[i].mw <= _max_power_mw)
+            ++num_active_levels;
+    if(num_active_levels > _num_active_levels) {
+        GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "The actual number of power levels (%u) > _num_active_levels (%u)", num_active_levels, uint8_t(_num_active_levels));
+        // num_active_levels = _num_active_levels;
     }
-    // iterate through to find the level
-    uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / float(_num_active_levels)) - 1), 0, num_active_levels - 1);
+    // Iterate through to find the level
+    // The level mapping is necessary only when num_active_levels != positions (6 for 6pos switch)
+    // const uint16_t level = constrain_int16(roundf((num_active_levels * (position + 1) / 6.f) - 1), 0, num_active_levels - 1);
+    const uint16_t level = round_div<uint8_t>(num_active_levels * (position + 1), _num_active_levels) - 1;
+    // const uint16_t level = position;
     debug("looking for pos %d power level %d from %d", position, level, num_active_levels);
     uint16_t power = 0;
     for (uint8_t i = 0, j = 0; i < num_active_levels; ++i, ++j) {
@@ -814,7 +898,7 @@ void AP_VideoTX::change_power(int8_t position)
             ++j;
         if (i == level) {
             if(j >= VTX_MAX_POWER_LEVELS) {
-                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The number of actual active levels (%u) < num_active_levels (%u)", i, num_active_levels);
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "The actual number of active levels (%u) < num_active_levels (%u)", i, num_active_levels);
                 return;
             }
             power = _power_levels[j].mw;
@@ -825,13 +909,12 @@ void AP_VideoTX::change_power(int8_t position)
 
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Setting VTX pwr: %u mw #%u", power, position);
     if (power == 0) {
-        // NOTE: We might intentionally want to turn off VTX to reduce/hide our radio profile unil moving to some further location
-        // if (!hal.util->get_soft_armed())    // don't allow pitmode to be entered if already armed
+        // NOTE: We might intentionally want to turn off VTX to reduce RF emissions temporary
+        // if (!hal.util->get_soft_armed())    // Don't allow pitmode to be entered if already armed
             set_configured_options(get_configured_options() | uint8_t(VideoOptions::VTX_PITMODE));
     } else {
-        if (has_option(VideoOptions::VTX_PITMODE)) {
+        if (has_option(VideoOptions::VTX_PITMODE))
             set_configured_options(get_configured_options() & ~uint8_t(VideoOptions::VTX_PITMODE));
-        }
         set_configured_power_mw(power);
     }
 }

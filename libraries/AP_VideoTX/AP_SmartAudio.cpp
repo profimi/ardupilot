@@ -262,13 +262,14 @@ void AP_SmartAudio::update_vtx_params()
             debug("update power (ver %d.%d)", ver_high(_protocol_version), ver_low(_protocol_version));
             switch (_protocol_version) {
             case SMARTAUDIO_SPEC_PROTOCOL_v21:
+                // Note: MSB (0x80) indicates to interpret Power Value in dBm rather than power index in the internal power table
                 set_power(0x80 | (vtx.model() != AP_VideoTX::Model::CUSTOM
                     ? vtx.get_configured_power_dbm() : vtx.get_configured_power_val()));
                 break;
             case SMARTAUDIO_SPEC_PROTOCOL_v2:
                 if(vtx.model() != AP_VideoTX::Model::CUSTOM)
                     set_power(vtx.get_configured_power_level());
-                else set_power(vtx.get_configured_power_val());
+                else set_power(vtx.get_configured_power_val());  // Level index in the internal power table is used
                 break;
             default:    // v1
                 if(vtx.model() != AP_VideoTX::Model::CUSTOM) {
@@ -569,8 +570,10 @@ void AP_SmartAudio::update_vtx_settings(const Settings& settings)
     // SA21 sends us a complete packet with the supported power levels
     if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v21) {
         vtx.set_power_dbm(settings.power_in_dbm);
-        // learn them all
-        vtx.update_all_power_dbm(settings.num_power_levels, settings.power_levels);
+        // Learn them all for the Generic model; other VTX models are already initialized
+        if(vtx.model() == AP_VideoTX::Model::GENERIC)
+            vtx.update_all_power_dbm(settings.num_power_levels, settings.power_levels);
+        else vtx.validate_active_power_dbm(settings.num_power_levels, settings.power_levels);
     } else if (settings.version == SMARTAUDIO_SPEC_PROTOCOL_v2) {
         vtx.set_power_level(settings.power, AP_VideoTX::PowerActive::Active);
         // learn them all if have not been initialized yet - it's not possible to know the mw values in v2.0 so just have to go from the spec
