@@ -245,10 +245,10 @@ AP_VideoTX::PowerLevel AP_VideoTX::_power_levels[] = {
     { 0x13, 1000, 30, 50 }, // only in SA 2.1; D1; TBS_UPD
     { 4,    1200, 31, 52 },
     { 0x14, 1600, 32, 56 },
-    { 5,    2000, 33, 60 }, // TBS_UPD3 (2W actual)
+    { 5,    2000, 33, 60 },
     { 0x15, 2500, 34, 65 }, // D1
-    // { 0x16, 3000, 35, 70 }, // AKK8/5/3
-    { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
+    { 6,    3000, 35, 70 }, // AKK8/5/3; TBS_UPD3 (2W shows, 3-3.5W actual)
+    { 0xFF, 0,    0, 0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 };
 
 const uint8_t VTX_MAX_POWER_LEVELS = sizeof(AP_VideoTX::_power_levels) / sizeof(AP_VideoTX::_power_levels[0]);
@@ -279,6 +279,12 @@ static_assert(VTX_MAX_POWER_LEVELS >= VTX_MAX_ADJUSTABLE_POWER_LEVELS, "VTX_MAX_
 //     { 0x13, 1000, 30, 0xFF }, // only in SA 2.1
 //     { 0xFF, 0,    0,  0XFF, PowerActive::Inactive }  // slot reserved for a custom power level
 // };
+
+/// Convert Power in dBm to mW
+inline uint16_t dbm_to_mw(uint8_t dbm)
+{
+    return roundf(powf(10, dbm * 0.1f));
+}
 
 AP_VideoTX::AP_VideoTX()
 {
@@ -359,10 +365,10 @@ bool AP_VideoTX::init(void)
         initPowerLevels(2500, {25, 1000, 2500});
         break;
     case Model::TBS_UPD_P3:
-        initPowerLevels(2000, {25, 1000, 2000});
+        initPowerLevels(2000, {25, 1000, 3000});
         break;
     case Model::TBS_UPD3:
-        initPowerLevels(2000, {25, 100, 200, 500, 1000, 2000});  // 25, 100, 200, 400, 1000, 3000; 2W actual emitting max
+        initPowerLevels(2000, {25, 100, 200, 500, 1000, 3000});  // 25, 100, 200, 400, 1000, 3000; Note: shows 2W, but actually emits 3-3.5W
         break;
     case Model::CUSTOM:
         for(uint8_t i = 0; i < _num_active_levels; ++i) {
@@ -474,18 +480,8 @@ void AP_VideoTX::set_power_dbm(uint8_t power, PowerActive active)
         return;
     }
 
-    uint8_t i = 0;
-    while(i < VTX_MAX_POWER_LEVELS && _power_levels[i].dbm < power)
-        ++i;
-    if (i < VTX_MAX_POWER_LEVELS && power == _power_levels[i].dbm) {
-        _current_power = i;
-        _power_levels[i].active = active;
-        debug("Learned power %d dBm", power);
-        return;
-    }
-
     // learn the non-standard power
-    _current_power = update_power_dbm(power, active, i);
+    _current_power = update_power_dbm(power, active);
 }
 
 // add an active power setting in dbm starting the search from the index i
@@ -502,7 +498,7 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t 
         }
         return i;
     }
-    // Insert new power level, replacing the existing one
+    // Insert new power level, replacing the existing one and ensuring the power level index is always valid
     if(i >= VTX_MAX_POWER_LEVELS)
         i = VTX_MAX_POWER_LEVELS - 1;
     // Move the previous value to the reserved custom slot; However that invalidates the ordering
@@ -511,7 +507,7 @@ uint8_t AP_VideoTX::update_power_dbm(uint8_t power, PowerActive active, uint8_t 
     _power_levels[i].dbm = power;
     // _power_levels[i].level = 0xFF;  // Retain the level number
     _power_levels[i].dac = 0xFF;
-    _power_levels[i].mw = uint16_t(roundf(powf(10, power * 0.1f)));
+    _power_levels[i].mw = dbm_to_mw(power);
     _power_levels[i].active = active;
     debug("non-standard power %d dbm: %d mw", power, _power_levels[i].mw);
     return i;
@@ -554,6 +550,9 @@ void AP_VideoTX::validate_active_power_dbm(uint8_t nlevels, const uint8_t power[
                     // _power_levels[i].active = PowerActive::Inactive;
                     GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Corrected power %u -> %u dBm", _power_levels[i].dbm, power[nlevels - 1]);
                     _power_levels[i].dbm = power[nlevels - 1];
+                    // _power_levels[i].level = 0xFF;  // Retain the level number
+                    _power_levels[i].dac = 0xFF;
+                    _power_levels[i].mw = dbm_to_mw(power[nlevels - 1]);
                 }
             break;
         }
@@ -639,10 +638,10 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
     // Get custom mW by the value, use approximate value if the exact one has not been found
     auto cmw = [this](uint16_t val) {
         uint8_t i = 0;
-        for (; i < _num_active_levels && _power_vals[i].val <= val; ++i)
-            if (val == _power_vals[i].val)
-                return _power_vals[i].mw;
-        if (i >= _num_active_levels || (i > 0 && _power_vals[i].mw - val > val - _power_vals[i-1].mw))
+        while(i < _num_active_levels && _power_vals[i].val < val)
+            ++i;
+        if (i >= _num_active_levels || (val != _power_vals[i].val && i > 0
+        && _power_vals[i].mw - val > val - _power_vals[i-1].mw))
             --i;
         return _power_vals[i].mw;
     };
@@ -652,14 +651,17 @@ void AP_VideoTX::set_power_val(uint16_t power, PowerActive active)
         return;
 
     for (uint8_t i = 0, j = 0; i < VTX_MAX_POWER_LEVELS && j < _num_active_levels;) {
-        if (_power_levels[i].mw >= _power_vals[j].mw) {
-            if (power == _power_vals[j].val) {
-                _current_power = i;
-                _power_levels[i].active = active;
-                debug("learned power %dmw", get_power_mw());
-                break;
-            } else ++j;
-        } else ++i;
+        if (_power_levels[i].mw < _power_vals[j].mw) {
+            ++i;
+            continue;
+        }
+        if (power == _power_vals[j].val) {
+            _current_power = i;
+            _power_levels[i].active = active;
+            debug("learned power %dmw", get_power_mw());
+            break;
+        }
+        ++j;
     }
 }
 

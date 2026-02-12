@@ -608,9 +608,8 @@ bool RC_Channel::read_npos_switch(int8_t& position)
 {
     // calculate position of 6 pos switch
     const uint16_t pulsewidth = get_radio_in();
-    if (pulsewidth <= RC_MIN_LIMIT_PWM || pulsewidth >= RC_MAX_LIMIT_PWM) {
+    if (pulsewidth <= RC_MIN_LIMIT_PWM || pulsewidth >= RC_MAX_LIMIT_PWM)
         return false;  // This is an error condition
-    }
 
     // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
     // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
