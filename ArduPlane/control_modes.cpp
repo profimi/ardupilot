@@ -28,6 +28,9 @@ Mode *Plane::mode_from_mode_num(const enum Mode::Number num)
     case Mode::Number::FLY_BY_WIRE_B:
         ret = &mode_fbwb;
         break;
+    case Mode::Number::FLY_BY_WIRE_C:
+        ret = &mode_fbwc;
+        break;
     case Mode::Number::CRUISE:
         ret = &mode_cruise;
         break;
@@ -116,9 +119,12 @@ void RC_Channel_Plane::mode_switch_changed(modeswitch_pos_t new_pos)
 {
     if (new_pos < 0 || (uint8_t)new_pos > plane.num_flight_modes) {
         // should not have been called
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Invalid flight mode requered: %u (>%u)",
+            static_cast<uint8_t>(new_pos), plane.num_flight_modes);
         return;
     }
 
+    gcs().send_text(MAV_SEVERITY_DEBUG, "mode_switch_changed(): setting mode #%u", new_pos);
     plane.set_mode_by_number((Mode::Number)plane.flight_modes[new_pos].get(), ModeReason::RC_COMMAND);
 }
 

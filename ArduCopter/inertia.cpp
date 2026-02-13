@@ -28,4 +28,8 @@ void Copter::read_inertia()
         // if home has not been set yet we treat alt-above-origin as alt-above-home
         current_loc.set_alt_m(alt_above_origin_m, Location::AltFrame::ABOVE_HOME);
     }
+
+    // set flags and get velocity
+    current_loc.flags.relative_alt = true;
+    climb_rate = inertial_nav.get_velocity_z();
 }

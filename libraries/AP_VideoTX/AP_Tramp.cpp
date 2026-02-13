@@ -127,7 +127,19 @@ char AP_Tramp::handle_response(void)
                 vtx.set_channel(channel);
             }
 
-            vtx.set_power_mw(power);
+            switch(vtx.model()) {
+            case AP_VideoTX::Model::D1:
+            case AP_VideoTX::Model::TBS_UPD:
+            case AP_VideoTX::Model::TBS_UPD3:
+                vtx.set_power_dbm(static_cast<uint8_t>(power));  // D1 uses power dbm values rather than power mw values
+                break;
+            case AP_VideoTX::Model::FXR10:
+            case AP_VideoTX::Model::CUSTOM:
+                vtx.set_power_val(power);
+                break;
+            default:
+                vtx.set_power_mw(power);
+            }
             if (pit_mode) {
                 vtx.set_options(vtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
             } else {
@@ -350,9 +362,23 @@ void AP_Tramp::process_requests()
                 // Set flag
                 configUpdateRequired = true;
             } else if (!is_race_lock_enabled() && vtx.update_power()) {
-                debug("Updating power to %umw\n", vtx.get_configured_power_mw());
+                debug("Updating power to %umw (dbm: %u)\n", vtx.get_configured_power_mw(), vtx.get_configured_power_dbm());
                 // Power can be and needs to be updated, issue request
-                send_command('P', vtx.get_configured_power_mw());
+                uint16_t  power = 0;
+                switch(vtx.model()) {
+                case AP_VideoTX::Model::D1:
+                case AP_VideoTX::Model::TBS_UPD:
+                case AP_VideoTX::Model::TBS_UPD3:
+                    power = vtx.get_configured_power_dbm();  // D1 uses power dbm values rather than power mw values
+                    break;
+                case AP_VideoTX::Model::FXR10:
+                case AP_VideoTX::Model::CUSTOM:
+                    power = vtx.get_configured_power_val();
+                    break;
+                default:
+                    power = vtx.get_configured_power_mw();
+                }
+                send_command('P', power);
 
                 // Set flag
                 configUpdateRequired = true;
@@ -472,11 +498,9 @@ void AP_Tramp::update()
     if (vtx.have_params_changed() && retry_count == 0) {
         // check changes in the order they will be processed
         if (vtx.update_frequency() || vtx.update_band() || vtx.update_channel()) {
-            if (vtx.update_frequency()) {
+            if (vtx.update_frequency())
                 vtx.update_configured_channel_and_band();
-            } else {
-                vtx.update_configured_frequency();
-            }
+            else vtx.update_configured_frequency();
             set_frequency(vtx.get_configured_frequency_mhz());
         }
         else if (vtx.update_power()) {

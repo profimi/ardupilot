@@ -87,6 +87,14 @@ void UARTDriver::_begin(uint32_t b, uint16_t rxS, uint16_t txS)
         }
     }
 
+    bool clear_buffers = false;
+    if (b != 0) {
+        if (_baudrate != b && hal.console != this) {
+            clear_buffers = true;
+        }
+        _baudrate = b;
+    }
+
     _allocate_buffers(rxS, txS);
 
     if (clear_buffers) {

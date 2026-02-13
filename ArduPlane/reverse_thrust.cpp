@@ -88,6 +88,7 @@ bool Plane::allow_reverse_thrust(void) const
         allow |= reverse_thrust_enabled(UseReverseThrust::CRUISE);
         break;
     case Mode::Number::FLY_BY_WIRE_B:
+    case Mode::Number::FLY_BY_WIRE_C:
         allow |= reverse_thrust_enabled(UseReverseThrust::FBWB);
         break;
     case Mode::Number::AVOID_ADSB:

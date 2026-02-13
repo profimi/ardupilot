@@ -257,6 +257,32 @@ const AP_Param::GroupInfo AP_OSD::var_info[] = {
     AP_SUBGROUPINFO(param_screen[1], "6_", 22, AP_OSD, AP_OSD_ParamScreen),
 #endif
 
+#if PLD_ARMING_ENABLED
+    // @Param: _PLD_RLY
+    // @DisplayName: Payload relay number
+    // @Description: Which relay is used for payload arm; 0 means use PLD_RCIN PWM signal rather than PLD_RLY 2xTTL
+    // CAUTION: either PLD_RLY (2x TTL) or PLD_RCIN (PWM: 1000/1500/2000) should be used for the payload arming
+    // NOTE: 3rd relay is recommended rather than 1st relay to prevent occasional usage of that relay in another hardware line
+    // @Range: 0 16
+    // @User: Standard
+    AP_GROUPINFO("_PLD_RLY", 37, AP_OSD, pld_relay, 0),
+
+    // @Param: _PLD_RCIN
+    // @DisplayName: Payload RC channel number (5-16)
+    // @Description: Which RCIN channel (AUX) is used for payload arm
+    // CAUTION: either PLD_RLY (2x TTL) or PLD_RCIN (PWM: 1000/1500/2000) should be used for the payload arming
+    // @Range: 5 16
+    // @User: Standard
+    AP_GROUPINFO("_PLD_RCIN", 38, AP_OSD, pld_rcin, 13),
+
+    // @Param: _PLD_TMT
+    // @DisplayName: Payload arming timeout (30 for 4pin, 60 for 3pin initiation board)
+    // @Description: Payload arming timeout in seconds. Note that this counter only shows countdown from relay flip. Real state depends on actual payload initiation board
+    // @Range: 0 10800
+    // @User: Standard
+    AP_GROUPINFO("_PLD_TMT", 39, AP_OSD, pld_timeout, 60),
+#endif
+
 #if OSD_ENABLED
     // additional tables to go beyond 63 limit
     AP_SUBGROUPINFO2(screen[0], "1_", 27, AP_OSD, AP_OSD_Screen),

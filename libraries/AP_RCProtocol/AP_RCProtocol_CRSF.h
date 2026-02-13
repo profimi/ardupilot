@@ -31,6 +31,8 @@
 #include <AP_OSD/AP_OSD_config.h>
 
 #define CRSF_FRAME_LENGTH_MIN 2 // min value for _frame.length
+#define UART_BAUDRATE      0         // Retain UART baudrate
+#define TBS_BAUDRATE       400000U   // TBS Crossfire, Sinelink SL
 #define CRSF_BAUDRATE      416666U
 #define ELRS_BAUDRATE      420000U
 #define CRSF_TX_TIMEOUT    500000U   // the period after which the transmitter is considered disconnected (matches copters failsafe)
@@ -52,7 +54,18 @@ public:
     // bootstrap baudrate
     uint32_t get_bootstrap_baud_rate() const {
 #if AP_RC_CHANNEL_ENABLED
-        return rc().option_is_enabled(RC_Channels::Option::ELRS_420KBAUD) ? ELRS_BAUDRATE : CRSF_BAUDRATE;
+        const uint8_t  baudConf = rc().option_is_enabled(RC_Channels::Option::TBS_400KBAUD) << 1 | rc().option_is_enabled(RC_Channels::Option::ELRS_420KBAUD);
+        switch(baudConf) {
+        case 1:
+            return ELRS_BAUDRATE;
+        case 2:
+            return TBS_BAUDRATE;
+        case 3:
+            return UART_BAUDRATE;
+        case 0:
+        default:
+             return CRSF_BAUDRATE;
+        }
 #else
         return CRSF_BAUDRATE;
 #endif
@@ -206,14 +219,14 @@ private:
     Frame _frame;
     uint8_t *_frame_bytes = (uint8_t*)&_frame;
     Frame _telemetry_frame;
-    uint8_t _frame_ofs;
+    uint8_t _frame_ofs;  // Offset (position) of the last received byte in _frame_bytes
 
     const uint8_t MAX_CHANNELS = MIN((uint8_t)CRSF_MAX_CHANNELS, (uint8_t)MAX_RCIN_CHANNELS);
 
     static AP_RCProtocol_CRSF* _singleton;
 
-    void _process_byte(uint8_t byte);
-    bool check_frame(uint32_t timestamp_us);
+    void _process_byte(uint8_t byte);  // Fills _frame_bytes, being unnecessary heavy by calling check_frame() for each byte rather than once per packet
+    bool check_frame(uint32_t timestamp_us);  // Validates or omits CRSF frame; unnecessary heavy and can be optimized avoiding memmove()
     void skip_to_next_frame(uint32_t timestamp_us);
     bool decode_crsf_packet();
     bool process_telemetry(bool check_constraint = true);

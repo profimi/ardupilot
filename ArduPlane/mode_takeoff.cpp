@@ -51,6 +51,25 @@ const AP_Param::GroupInfo ModeTakeoff::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("GND_PITCH", 5, ModeTakeoff, ground_pitch, 5),
 
+    // @Param: CTL_SUPR
+    // @DisplayName: Takeoff control signals suppression (on max throttle)
+    // @Description: Control signals suppression ratio in the Takeoff mode on max throttle. Recommended value: 0.05-0.25. Provides mild takeoff without abrupt maneuvers near the ground
+    // @Units: ratio
+    // @Range: 0.0 1.0
+    // @Increment: 0.01
+    // @User: Standard
+    AP_GROUPINFO("CTL_SUPR", 6, ModeTakeoff, ctl_supr, 0.1),
+
+    // @Param: CTL_ALTR
+    // @DisplayName: Takeoff control signals release on current altitude
+    // @Description: Control signals release ratio in the Takeoff mode on current altitude. Recommended value: 0.1-0.3. Boosts resistance to crosswinds
+    // @Units: ratio
+    // @Range: 0.0 1.0
+    // @Increment: 0.01
+    // @User: Standard
+    AP_GROUPINFO("CTL_ALTR", 7, ModeTakeoff, ctl_altr, 0.2),
+    
+
     AP_GROUPEND
 };
 
@@ -70,11 +89,13 @@ bool ModeTakeoff::_enter()
 
 void ModeTakeoff::update()
 {
-    // don't setup waypoints if we dont have a valid position and home!
-    if (!(plane.current_loc.initialised() && AP::ahrs().home_is_set())) {
+    // Don't setup waypoints if we dont have a valid position and home!
+    // Skip this check in the unsafe takeoff mode
+    if (!plane.g2.takeoff_unsafe && !(plane.current_loc.initialised() && AP::ahrs().home_is_set())) {
         plane.calc_nav_roll();
         plane.calc_nav_pitch();
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);  // Turn off the control signal scaling
+        gcs().send_text(MAV_SEVERITY_INFO, "Cancelling the safe takeoff, given the absent location");
         return;
     }
 
@@ -179,6 +200,8 @@ void ModeTakeoff::update()
         plane.takeoff_calc_roll();
         plane.takeoff_calc_pitch();
         plane.takeoff_calc_throttle();
+        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, ctl_supr);  // Evaluate at the rate of 10-20% throttle
+        // SRV_Channels::calc_pwm();
     } else {
 #if AP_FENCE_ENABLED
         if (!have_autoenabled_fences) {

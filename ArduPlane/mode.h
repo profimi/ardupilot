@@ -71,7 +71,9 @@ public:
         AUTOLAND      = 26,
 #endif
 
-    // Mode number 30 reserved for "offboard" for external/lua control.
+        // Custom
+        FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronuously set to this value to support Flight mode switching from RC
+        // Mode number 30 reserved for "offboard" for external/lua control.
     };
 
     // Constructor
@@ -252,6 +254,7 @@ protected:
     bool _enter() override;
 };
 
+//  Plane follows a mission
 class ModeAuto : public Mode
 {
 public:
@@ -662,6 +665,33 @@ protected:
     bool _enter() override;
 };
 
+// Like FBWB but with automatic roll control and without taking pitch change from RC and without reacting on the right stick (see also STICK_MIXING)
+class ModeFBWC : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::FLY_BY_WIRE_C; }
+    const char *name() const override { return "FLY_BY_WIRE_C"; }
+    const char *name4() const override { return "FBWC"; }
+
+    bool allows_terrain_disable() const override { return true; }
+
+    bool does_automatic_thermal_switch() const override { return true; }
+
+    // Methods that affect movement of the vehicle in this mode
+    void update() override;
+
+    bool does_auto_throttle() const override { return true; }
+    
+    bool mode_allows_autotuning() const override { return false; }
+
+    void update_target_altitude() override {};
+
+protected:
+    float target_yaw = 0.0f;
+    bool _enter() override;
+};
+
 class ModeCruise : public Mode
 {
 public:
@@ -957,6 +987,8 @@ public:
     AP_Int16 target_alt;
     AP_Int16 level_alt;
     AP_Float ground_pitch;
+    AP_Float ctl_supr;
+    AP_Float ctl_altr;
 
 protected:
     AP_Int16 target_dist;

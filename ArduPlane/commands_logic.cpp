@@ -607,7 +607,7 @@ bool Plane::verify_takeoff()
     if (
         relative_alt_cm > auto_state.takeoff_altitude_rel_cm || // altitude reached
         plane.check_takeoff_timeout_level_off() // pitch level-off maneuver has timed out
-        ) {
+    ) {
         gcs().send_text(MAV_SEVERITY_INFO, "Takeoff complete at %.2fm",
                           (double)(relative_alt_cm*0.01f));
         steer_state.hold_course_cd = -1;
@@ -1309,6 +1309,7 @@ bool Plane::nav_scripting_enable(uint8_t mode)
        case Mode::Number::ACRO:
        case Mode::Number::FLY_BY_WIRE_A:
        case Mode::Number::FLY_BY_WIRE_B:
+       case Mode::Number::FLY_BY_WIRE_C:
        case Mode::Number::CRUISE:
        case Mode::Number::LOITER:
            nav_scripting.enabled = true;

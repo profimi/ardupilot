@@ -158,7 +158,7 @@ void Plane::calc_airspeed_errors()
 
 
     // FBW_B/cruise airspeed target
-    if (!failsafe.rc_failsafe && (control_mode == &mode_fbwb || control_mode == &mode_cruise)) {
+    if (!failsafe.rc_failsafe && (control_mode == &mode_fbwb || control_mode == &mode_cruise || control_mode == &mode_fbwc)) {
         if (flight_option_enabled(FlightOptions::CRUISE_TRIM_AIRSPEED)) {
             target_airspeed_cm = aparm.airspeed_cruise*100;
         } else if (flight_option_enabled(FlightOptions::CRUISE_TRIM_THROTTLE)) {
@@ -395,11 +395,11 @@ void Plane::update_loiter(uint16_t radius)
 }
 
 /*
-  handle speed and height control in FBWB, CRUISE, and optionally, LOITER mode.
-  In this mode the elevator is used to change target altitude. The
-  throttle is used to change target airspeed or throttle
+  handle speed and height control in FBWB, CRUISE, FBWC and optionally, LOITER mode.
+  The throttle is used to change target airspeed or throttle. And, optionally,
+  the elevator is used to change target altitude.
  */
-void Plane::update_fbwb_speed_height(void)
+void Plane::update_fbwb_speed_height(bool alt_fixed)
 {
     uint32_t now = micros();
     if (now - target_altitude.last_elev_check_us >= 100000) {
@@ -410,7 +410,7 @@ void Plane::update_fbwb_speed_height(void)
 
         target_altitude.last_elev_check_us = now;
 
-        float elevator_input = channel_pitch->get_control_in() * (1/4500.0);
+        float elevator_input = alt_fixed ? 0 : channel_pitch->get_control_in() * (1/4500.0);
 
         if (g.flybywire_elev_reverse) {
             elevator_input = -elevator_input;

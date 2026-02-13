@@ -213,7 +213,7 @@ void AP_CRSF_Telem::setup_custom_telemetry()
     // setup custom telemetry for current rf_mode
     update_custom_telemetry_rates(_telem_rf_mode);
 
-    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"%s: custom telem init done, fw %d.%02d", get_protocol_string(), _crsf_version.major, _crsf_version.minor);
+    debug("%s: custom telem init done, fw %d.%02d", get_protocol_string(), _crsf_version.major, _crsf_version.minor);  // GCS_SEND_TEXT
 
     _custom_telem.init_done = true;
 }
@@ -296,7 +296,7 @@ bool AP_CRSF_Telem::process_rf_mode_changes()
     if ((now - _telem_last_report_ms > 5000)) {
         // report an RF mode change or a change in telemetry rate if we haven't done so in the last 5s
         if (!rc().option_is_enabled(RC_Channels::Option::SUPPRESS_CRSF_MESSAGE) && (_telem_rf_mode != current_rf_mode || abs(int16_t(_telem_last_avg_rate) - int16_t(_scheduler.avg_packet_rate)) > 25)) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "%s: Link rate %dHz, Telemetry rate %dHz",
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "%s: Link rate %dHz, Telemetry rate %dHz",
                 get_protocol_string(), crsf->get_link_rate(_crsf_version.protocol), get_telemetry_rate());
         }
         // tune the scheduler based on telemetry speed high/low transitions
@@ -549,13 +549,13 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
             update_vtx_params();
             break;
 #endif
-        case BATTERY: // BATTERY
+        case BATTERY:
             calc_battery();
             break;
-        case GPS: // GPS
+        case GPS:
             calc_gps();
             break;
-        case FLIGHT_MODE: // GPS
+        case FLIGHT_MODE:
             calc_flight_mode();
             break;
         case PASSTHROUGH:
@@ -587,13 +587,13 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
                 _crsf_version.minor = 0;
                 _crsf_version.major = 0;
                 disable_scheduler_entry(VERSION_PING);
-                GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"%s: RX device ping failed", get_protocol_string());
+                debug("%s: RX device ping failed", get_protocol_string());  // GCS_SEND_TEXT
             } else {
                 calc_device_ping(AP_CRSF_Protocol::CRSF_ADDRESS_CRSF_RECEIVER);
                 uint32_t tnow_ms = AP_HAL::millis();
                 if ((tnow_ms - _crsf_version.last_request_info_ms) > 5000) {
                     _crsf_version.last_request_info_ms = tnow_ms;
-                    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG,"%s: requesting RX device info", get_protocol_string());
+                    debug("%s: requesting RX device info", get_protocol_string());
                 }
             }
             break;
@@ -606,7 +606,8 @@ void AP_CRSF_Telem::process_packet(uint8_t idx)
 }
 
 // Process a frame from the CRSF protocol decoder
-bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, void* data, uint8_t length) {
+bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, void* data, uint8_t length)
+{
     switch (frame_type) {
     // this means we are connected to an RC receiver and can send telemetry
     case AP_CRSF_Protocol::CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
@@ -653,45 +654,49 @@ bool AP_CRSF_Telem::_process_frame(AP_RCProtocol_CRSF::FrameType frame_type, voi
 }
 
 #if AP_VIDEOTX_ENABLED
-void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
-    vtx->user_frequency = be16toh(vtx->user_frequency);
+void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx)
+{
+    AP_VideoTX& apvtx = AP::vtx();
+    // Consider both BigEndian and LowEndian VTX responds
+    if(apvtx.get_configured_frequency_mhz() != vtx->user_frequency)
+        vtx->user_frequency = be16toh(vtx->user_frequency);
 
     debug("VTX: SmartAudio: %d, Avail: %d, FreqMode: %d, Band: %d, Channel: %d, Freq: %d, PitMode: %d, Pwr: %d, Pit: %d",
         vtx->smart_audio_ver, vtx->is_vtx_available, vtx->is_in_user_frequency_mode,
-        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel),
+        vtx->band, vtx->channel, vtx->is_in_user_frequency_mode ? vtx->user_frequency : apvtx.get_frequency_mhz(vtx->band, vtx->channel),
         vtx->is_in_pitmode, vtx->power, vtx->pitmode);
-    AP_VideoTX& apvtx = AP::vtx();
 
     // the user may have a VTX connected but not want AP to control it
     // (for instance because they are using myVTX on the transmitter)
-    if (!apvtx.get_enabled()) {
+    if (!apvtx.get_enabled())
         return;
-    }
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
-    apvtx.set_band(vtx->band);
-    apvtx.set_channel(vtx->channel);
-    if (vtx->is_in_user_frequency_mode) {
-        apvtx.set_frequency_mhz(vtx->user_frequency);
-    } else {
-        apvtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx->band, vtx->channel));
+    bool isFreqSet = false;
+    if (vtx->is_in_user_frequency_mode || apvtx.is_user_freq()) {
+        // Note: in case of repetitive frequency signal move this snippet to the init() together with the apvtx.is_user_freq() condition
+        if(!vtx->is_in_user_frequency_mode) {
+            // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "CRSF: apvtx.is_user_freq: %u", apvtx.is_user_freq());
+            vtx->is_in_user_frequency_mode = true;
+            apvtx.set_frequency_mhz(vtx->user_frequency);
+        }
+
+        AP_VideoTX::VideoBand band;
+        uint8_t channel;
+        if (apvtx.get_band_and_channel(vtx->user_frequency, band, channel)) {
+            apvtx.set_band(static_cast<uint8_t>(band));
+            apvtx.set_channel(channel);
+            isFreqSet = true;
+        }
+    } 
+    if (!isFreqSet) {
+        apvtx.set_band(vtx->band);
+        apvtx.set_channel(vtx->channel);
+        apvtx.set_frequency_mhz(apvtx.get_frequency_mhz(vtx->band, vtx->channel));
     }
-    // 14dBm (25mW), 20dBm (100mW), 26dBm (400mW), 29dBm (800mW)
-    switch (vtx->power) {
-        case 0:
-            apvtx.set_power_mw(25);
-            break;
-        case 1:
-            apvtx.set_power_mw(100);
-            break;
-        case 2:
-            apvtx.set_power_mw(400);
-            break;
-        case 3:
-            apvtx.set_power_mw(800);
-            break;
-    }
+
+    apvtx.set_power_mw(apvtx.power_at_lev(vtx->power));
     if (vtx->is_in_pitmode) {
         apvtx.set_options(apvtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     } else {
@@ -707,14 +712,14 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
 
 void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
 {
-    vtx->frequency = be16toh(vtx->frequency);
+    AP_VideoTX& apvtx = AP::vtx();
+    // Consider both BigEndian and LowEndian VTX responds
+    if(apvtx.get_configured_frequency_mhz() != vtx->frequency)
+        vtx->frequency = be16toh(vtx->frequency);
     debug("VTXTelemetry: Freq: %d, PitMode: %d, Power: %d", vtx->frequency, vtx->pitmode, vtx->power);
 
-    AP_VideoTX& apvtx = AP::vtx();
-
-    if (!apvtx.get_enabled()) {
+    if (!apvtx.get_enabled())
         return;
-    }
 
     apvtx.set_provider_enabled(AP_VideoTX::VTXType::CRSF);
 
@@ -722,13 +727,12 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
 
     AP_VideoTX::VideoBand band;
     uint8_t channel;
-    if (AP_VideoTX::get_band_and_channel(vtx->frequency, band, channel)) {
-        apvtx.set_band(uint8_t(band));
+    if (apvtx.get_band_and_channel(vtx->frequency, band, channel)) {
+        apvtx.set_band(static_cast<uint8_t>(band));
         apvtx.set_channel(channel);
     }
 
     apvtx.set_power_dbm(vtx->power);
-
     if (vtx->pitmode) {
         apvtx.set_options(apvtx.get_options() | uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     } else {
@@ -916,10 +920,14 @@ void AP_CRSF_Telem::update_vtx_params()
     if (_vtx_freq_change_pending || _vtx_power_change_pending || _vtx_options_change_pending) {
         // make the desired frequency match the desired band and channel
         if (_vtx_freq_change_pending) {
-            if (vtx.update_band() || vtx.update_channel()) {
+            if (!vtx.is_user_freq() && (vtx.update_band() || vtx.update_channel()))
                 vtx.update_configured_frequency();
-            } else {
+            else {
                 vtx.update_configured_channel_and_band();
+                if(vtx.is_user_freq()) {
+                    vtx.set_band(vtx.get_configured_band());
+                    vtx.set_channel(vtx.get_configured_channel());
+                }
             }
         }
 
@@ -939,20 +947,25 @@ void AP_CRSF_Telem::update_vtx_params()
         // prioritize option changes so that the pilot can get in and out of pitmode
         if (_vtx_options_change_pending) {
             _telem.ext.command.payload[0] = AP_CRSF_Protocol::CRSF_COMMAND_VTX_PITMODE;
-            if (vtx.get_configured_options() & uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE)) {
+            if (vtx.get_configured_options() & uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE))
                 _telem.ext.command.payload[1] = 1;
-            } else {
-                _telem.ext.command.payload[1] = 0;
-            }
+            else _telem.ext.command.payload[1] = 0;
         } else if (_vtx_freq_change_pending && _vtx_freq_update) {
             _telem.ext.command.payload[0] = AP_CRSF_Protocol::CRSF_COMMAND_VTX_FREQ;
             _telem.ext.command.payload[1] = (vtx.get_frequency_mhz() & 0xFF00) >> 8;
             _telem.ext.command.payload[2] = (vtx.get_frequency_mhz() & 0xFF);
+            ++len;
             _vtx_freq_update = false;
-            len++;
         } else if (_vtx_freq_change_pending) {
             _telem.ext.command.payload[0] = AP_CRSF_Protocol::CRSF_COMMAND_VTX_CHANNEL;
-            _telem.ext.command.payload[1] = vtx.get_configured_band() * VTX_MAX_CHANNELS + vtx.get_configured_channel();
+            _telem.ext.command.payload[1] = vtx.get_configured_band() * BAND_CHANNELS_NUM + vtx.get_configured_channel();
+
+            // // Note: 2 byte abs channel is required for > 32 bands with 8 channels
+            // const uint16_t  chan = static_cast<uint16_t>(vtx.get_configured_band()) * BAND_CHANNELS_NUM + vtx.get_configured_channel();
+            // _telem.ext.command.payload[1] = chan >> 8;
+            // _telem.ext.command.payload[2] = chan & 0xFF;
+            // ++len;
+
             _vtx_freq_update = true;
         } else if (_vtx_power_change_pending && _vtx_dbm_update) {
             _telem.ext.command.payload[0] = AP_CRSF_Protocol::CRSF_COMMAND_VTX_POWER_DBM;
@@ -960,23 +973,17 @@ void AP_CRSF_Telem::update_vtx_params()
             _vtx_dbm_update = false;
         } else if (_vtx_power_change_pending) {
             _telem.ext.command.payload[0] = AP_CRSF_Protocol::CRSF_COMMAND_VTX_POWER;
-            if (vtx.get_configured_power_mw() < 26) {
+            if (vtx.get_configured_power_mw() == 0)
+                vtx.set_configured_power_mw(0);
+            else if (vtx.get_configured_power_mw() <= 25)
                 vtx.set_configured_power_mw(25);
-            } else if (vtx.get_configured_power_mw() < 201) {
-                if (vtx.get_configured_power_mw() < 101) {
-                    vtx.set_configured_power_mw(100);
-                } else {
-                    vtx.set_configured_power_mw(200);
-                }
-            } else if (vtx.get_configured_power_mw() < 501) {
-                if (vtx.get_configured_power_mw() < 401) {
-                    vtx.set_configured_power_mw(400);
-                } else {
-                    vtx.set_configured_power_mw(500);
-                }
-            } else {
-                vtx.set_configured_power_mw(800);
-            }
+            else if (vtx.get_configured_power_mw() <= 100)
+                vtx.set_configured_power_mw(100);
+            else if (vtx.get_configured_power_mw() <= 200)
+                vtx.set_configured_power_mw(200);
+            else if (vtx.get_configured_power_mw() <= 400)
+                vtx.set_configured_power_mw(400);
+            else vtx.set_configured_power_mw(vtx.get_configured_power_mw());
             _telem.ext.command.payload[1] = vtx.get_configured_power_level();
             _vtx_dbm_update = true;
         }

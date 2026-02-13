@@ -34,6 +34,8 @@
 class RC_Channel {
 public:
     friend class RC_Channels;
+    friend class RC_Channel_Plane;
+
     // Constructor
     RC_Channel(void);
 
@@ -118,6 +120,11 @@ public:
 
     // set and save trim if changed
     void       set_and_save_radio_trim(int16_t val) { radio_trim.set_and_save_ifchanged(val);}
+    
+    /// @brief Sets the number of positions n for the npos switch
+    /// @param levs  - the number of levels (positions): 2 .. 8, default: 6
+    /// @return whether the value is update or ignored being out of the acceptable range
+    bool       set_npos_switch_levels(uint8_t levs);
 
     // check if any of the trim/min/max param are configured, this would indicate that the user has done a calibration at somepoint
     bool       configured() { return radio_min.configured() || radio_max.configured() || radio_trim.configured(); }
@@ -372,6 +379,11 @@ public:
 #if AP_MOUNT_POI_LOCK_ENABLED
         MOUNT_POI_LOCK =     186,  // Lock mount target to current ROI seen and switch mount to GPS Targeting mode
 #endif  // AP_MOUNT_POI_LOCK_ENABLED
+
+        VTX_PRESET =         197, // VTX preset change function
+        VTX_BAND =           198, // VTX band change function
+        VTX_CHANNEL =        199, // VTX channel change function
+
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
         PITCH =              202, // pitch input
@@ -398,8 +410,17 @@ public:
         TRANSMITTER_TUNING2 = 220, // use another transmitter knob or slider for in-flight tuning
 #endif  // AP_RC_TRANSMITTER_TUNING_ENABLED
 
+        // Extra control functions
+        KILL_THROTTLE_LR =   240,  // Set the lowest value of throttle_l (RC switch LOW) / throttle_r (RC switch HIGHT), which are bound to motors x / y using relation 1:n
+        // KILL_MOTOR1 =        241,  // Set the lowest value of throttle for motor 1
+        // KILL_MOTOR2 =        242,  // Set the lowest value of throttle for motor 2
+
         // inputs 248-249 are reserved for the Skybrush fork at
         // https://github.com/skybrush-io/ardupilot
+
+        // Custom AUX functions
+        FBWB =                250, // Fly-By-Wire-B
+        FBWC =                251, // Fly-By-Wire-C
 
 #if AP_SCRIPTING_ENABLED
         // inputs for the use of onboard lua scripting
@@ -482,7 +503,6 @@ public:
     static const uint16_t AUX_PWM_TRIGGER_LOW = 1300;
 
 protected:
-
     __INITFUNC__ virtual void init_aux_function(AUX_FUNC ch_option, AuxSwitchPos);
 
     // virtual function to be overridden my subclasses
@@ -517,16 +537,12 @@ protected:
         // no action by default (e.g. Tracker, Sub, who do their own thing)
     };
 
-    // the input channel this corresponds to
-    uint8_t ch_in;
-
 private:
-
     // pwm is stored here
     int16_t     radio_in;
 
     // value generated from PWM normalised to configured scale
-    int16_t    control_in;
+    int16_t     control_in;
 
     AP_Int16    radio_min;
     AP_Int16    radio_trim;
@@ -537,6 +553,11 @@ private:
 
     ControlType type_in;
     int16_t     high_in;
+
+    // the input channel this corresponds to
+    uint8_t     ch_in;
+
+    uint8_t     npos_levs;  // The number of positions (levels) in npos switch per RC channel: 2 .. 8
 
     // overrides
     uint16_t override_value;
@@ -550,6 +571,7 @@ private:
 
     bool read_3pos_switch(AuxSwitchPos &ret) const WARN_IF_UNUSED;
     bool read_6pos_switch(int8_t& position) WARN_IF_UNUSED;
+    bool read_npos_switch(int8_t& position) WARN_IF_UNUSED;  // Applied to set VTX power levels and others
 
     // Structure used to detect and debounce switch changes
     struct {
@@ -676,6 +698,7 @@ public:
         USE_CRSF_LQ_AS_RSSI     = (1U << 11), // returns CRSF link quality as RSSI value, instead of RSSI
         CRSF_FM_DISARM_STAR     = (1U << 12), // when disarmed, add a star at the end of the flight mode in CRSF telemetry
         ELRS_420KBAUD           = (1U << 13), // use 420kbaud for ELRS protocol
+        TBS_400KBAUD            = (1U << 14), // use 400kbaud for ELRS protocol; UART baud is retained if both TBS_400KBAUD and ELRS_420KBAUD are specified
     };
 
     bool option_is_enabled(Option option) const {

@@ -63,6 +63,14 @@ extern const AP_HAL::HAL& hal;
 #include <AP_Scripting/AP_Scripting.h>
 #define SWITCH_DEBOUNCE_TIME_MS  200
 
+// // #define RC_CH_DEBUG
+// #ifdef RC_CH_DEBUG
+// # define debug(fmt, args...)	GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC_CH: " fmt "\n", ##args)
+// // hal.console->printf("SRV: " fmt "\n", ##args)
+// #else
+// # define debug(fmt, args...)	do {} while(0)
+// #endif
+
 const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Param: MIN
     // @DisplayName: RC min PWM
@@ -252,6 +260,9 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Plane}: 184: System ID Chirp
     // @Values{Copter, Rover, Plane, Blimp, Sub}:  185:Mount Roll/Pitch Lock
     // @Values{Copter, Rover, Plane, Blimp, Sub}:  186:Mount POI Lock
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 197:VTX Preset
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 198:VTX Band
+    // @Values{Copter, Rover, Plane, Blimp, Sub}: 199:VTX Channel
     // @Values{Rover}: 201:Roll
     // @Values{Rover}: 202:Pitch
     // @Values{Rover}: 207:MainSail
@@ -262,6 +273,8 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter, Rover, Plane, Sub}: 212:Mount1 Roll, 213:Mount1 Pitch, 214:Mount1 Yaw, 215:Mount2 Roll, 216:Mount2 Pitch, 217:Mount2 Yaw
     // @Values{Copter, Rover, Plane, Blimp, Sub}:  218:Loweheiser throttle
     // @Values{Copter}: 219:Transmitter Tuning
+    // @Values{Plane}: 240:Kill Throttle LR
+    // @Values{Plane}: 250:FBWB, 251:FBWC
     // @Values{All-Vehicles}: 300:Scripting1, 301:Scripting2, 302:Scripting3, 303:Scripting4, 304:Scripting5, 305:Scripting6, 306:Scripting7, 307:Scripting8, 308:Scripting9, 309:Scripting10, 310:Scripting11, 311:Scripting12, 312:Scripting13, 313:Scripting14, 314:Scripting15, 315:Scripting16
     // @Values{All-Vehicles}: 316:Stop-Restart Scripting
     // @User: Standard
@@ -273,6 +286,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
 
 // constructor
 RC_Channel::RC_Channel(void)
+: npos_levs{6}
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -585,7 +599,7 @@ void RC_Channel::reset_mode_switch()
     read_mode_switch();
 }
 
-// read a 6 position switch
+// Read 6 position switch
 bool RC_Channel::read_6pos_switch(int8_t& position)
 {
     // calculate position of 6 pos switch
@@ -594,23 +608,48 @@ bool RC_Channel::read_6pos_switch(int8_t& position)
         return false;  // This is an error condition
     }
 
-    if (pulsewidth < 1231) {
-        position = 0;
-    } else if (pulsewidth < 1361) {
-        position = 1;
-    } else if (pulsewidth < 1491) {
-        position = 2;
-    } else if (pulsewidth < 1621) {
-        position = 3;
-    } else if (pulsewidth < 1750) {
-        position = 4;
-    } else {
-        position = 5;
-    }
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    // Formal PWM range: 1000 - 2000, but can be up to 800 - 2200; Our: 888 - 2112
+    constexpr uint16_t  chMarks[] = {1090, 1294, 1499, 1704, 1909};
+    constexpr uint8_t  posMax = sizeof(chMarks) / sizeof(*chMarks);
+    while(position < posMax && pulsewidth >= chMarks[position])
+        ++position;
 
-    if (!debounce_completed(position)) {
+    if (!debounce_completed(position))
         return false;
-    }
+
+    return true;
+}
+
+bool RC_Channel::set_npos_switch_levels(uint8_t levs)
+{
+    if(levs < 2 || levs > 8)
+        return false;
+    npos_levs = levs;
+    return true;
+}
+
+// Read n position switch
+bool RC_Channel::read_npos_switch(int8_t& position)
+{
+    // calculate position of 6 pos switch
+    const uint16_t pulsewidth = get_radio_in();
+    if (pulsewidth <= RC_MIN_LIMIT_PWM || pulsewidth >= RC_MAX_LIMIT_PWM)
+        return false;  // This is an error condition
+
+    // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "read_6pos_switch() pulsewidth: %u", pulsewidth);
+    // Original:  1231, 1361, 1491, 1621, 1750;  d = 130  (takes the first 6 positions out of 8)
+    // Our old: 1110, 1305, 1500, 1694, 1888
+    // Middles of the RadioMaster RC 6-pos ranges are set;  d = 204
+    // Formal PWM range: 1000 - 2000, but can be up to 800 - 2200; Our: 888 - 2112
+    // position = static_cast<uint8_t>(round_div<uint8_t>((pulsewidth - RC_MIN_LIMIT_PWM) * npos_levs), RC_MAX_LIMIT_PWM - RC_MIN_LIMIT_PWM));
+    position = round_div((pulsewidth - RC_MIN_LIMIT_PWM) * npos_levs, RC_MAX_LIMIT_PWM - RC_MIN_LIMIT_PWM);
+
+    if (!debounce_completed(position))
+        return false;
 
     return true;
 }
@@ -727,6 +766,9 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
 #if AP_VIDEOTX_ENABLED
     case AUX_FUNC::VTX_POWER:
+    case AUX_FUNC::VTX_PRESET:
+    case AUX_FUNC::VTX_BAND:
+    case AUX_FUNC::VTX_CHANNEL:
 #endif
 #if AP_OPTICALFLOW_CALIBRATOR_ENABLED
     case AUX_FUNC::OPTFLOW_CAL:
@@ -755,6 +797,8 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #if HAL_GENERATOR_ENABLED
     case AUX_FUNC::LOWEHEISER_THROTTLE:
 #endif
+    // Custom extensions
+    case AUX_FUNC::KILL_THROTTLE_LR:
         break;
 
     // these functions require explicit initialization
@@ -860,6 +904,7 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
 #endif
     { AUX_FUNC::MOTOR_ESTOP,"MotorEStop"},
     { AUX_FUNC::MOTOR_INTERLOCK,"MotorInterlock"},
+    { AUX_FUNC::KILL_THROTTLE_LR, "Kill Throttle L/R Switch"},
 #if AP_SERVORELAYEVENTS_ENABLED && AP_RELAY_ENABLED
     { AUX_FUNC::RELAY2,"Relay2"},
     { AUX_FUNC::RELAY3,"Relay3"},
@@ -934,6 +979,12 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
 #if HAL_MOUNT_ENABLED
     { AUX_FUNC::MOUNT_LRF_ENABLE, "Mount LRF Enable"},
 #endif
+#if AP_VIDEOTX_ENABLED
+    {AUX_FUNC::VTX_POWER, "VTX Power"},
+    {AUX_FUNC::VTX_PRESET, "VTX Bands & Channels Preset"},
+    {AUX_FUNC::VTX_BAND, "VTX Bands"},
+    {AUX_FUNC::VTX_CHANNEL, "VTX Channels"},
+#endif
 };
 
 /* lookup the announcement for switch change */
@@ -976,8 +1027,40 @@ bool RC_Channel::read_aux()
 #if AP_VIDEOTX_ENABLED
     } else if (_option == AUX_FUNC::VTX_POWER) {
         int8_t position;
-        if (read_6pos_switch(position)) {
+        if (read_npos_switch(position)) {
+            GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Power switch pos: %u\n", position);
             AP::vtx().change_power(position);
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_CHANNEL) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            // GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RC Freq switch pos: %u\n", position);
+            AP::vtx().set_channel(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            // AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_BAND) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_band(position);
+            // AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
+            return true;
+        }
+        return false;
+    } else if (_option == AUX_FUNC::VTX_PRESET) {
+        int8_t position;
+        if (read_6pos_switch(position)) {
+            AP::vtx().set_preset(position);
+            AP::vtx().set_configured_channel(AP::vtx().get_channel());
+            AP::vtx().set_configured_band(AP::vtx().get_band());
+            AP::vtx().update_configured_frequency();
             return true;
         }
         return false;
@@ -1668,6 +1751,9 @@ bool RC_Channel::do_aux_function(const AuxFuncTrigger &trigger)
             break;
         }
         }
+        break;
+
+    case AUX_FUNC::KILL_THROTTLE_LR:
         break;
 
 #if HAL_VISUALODOM_ENABLED

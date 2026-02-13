@@ -131,6 +131,7 @@ bool ModeThermal::exit_heading_aligned() const
         return plane.mode_loiter.isHeadingLinedUp(plane.next_WP_loc, current_nav_cmd.content.location);
     }
     case Mode::Number::FLY_BY_WIRE_B:
+    case Mode::Number::FLY_BY_WIRE_C:
         return (!AP::ahrs().home_is_set() || plane.mode_loiter.isHeadingLinedUp(plane.next_WP_loc, AP::ahrs().get_home()));
     case Mode::Number::CRUISE:
         int32_t target_heading_cd;

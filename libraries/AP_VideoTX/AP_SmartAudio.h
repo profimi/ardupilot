@@ -59,9 +59,9 @@
 #define SMARTAUDIO_RSP_SET_FREQUENCY    SMARTAUDIO_CMD_SET_FREQUENCY >> 1
 #define SMARTAUDIO_RSP_SET_MODE         SMARTAUDIO_CMD_SET_MODE >> 1
 
-#define SMARTAUDIO_BANDCHAN_TO_INDEX(band, channel) (band * VTX_MAX_CHANNELS + (channel))
+#define SMARTAUDIO_BANDCHAN_TO_INDEX(band, channel) (band * BAND_CHANNELS_NUM + (channel))
 
-//#define SA_DEBUG
+// #define SA_DEBUG
 
 class AP_SmartAudio
 {
@@ -71,6 +71,10 @@ public:
         SMARTAUDIO_SPEC_PROTOCOL_v2 = 1,
         SMARTAUDIO_SPEC_PROTOCOL_v21 = 2
     };
+
+    //! High and low components of the version
+    static uint8_t ver_high(ProtocolVersion ver);
+    static uint8_t ver_low(ProtocolVersion ver);
 
     struct Settings {
         uint8_t  version;
@@ -82,7 +86,7 @@ public:
 
         uint8_t num_power_levels;
         uint8_t power_levels[8];
-        uint8_t  power_in_dbm;
+        uint8_t power_in_dbm;
 
         uint16_t pitmodeFrequency;
         bool userFrequencyMode;     // user is setting freq
@@ -235,12 +239,10 @@ private:
     void set_operation_mode(uint8_t mode);
     // change the frequency
     void set_frequency(uint16_t frequency, bool isPitModeFreq);
-    // change the channel
+    // change the channel that already includes its band
     void set_channel(uint8_t chan);
     // get the pitmode frequency
     void request_pit_mode_frequency();
-    // set the power
-    void set_power(uint16_t power_mw, uint16_t dbm);
     // set the power using power_level, spec versions 1 and 2 or dbm value for spec version 2.1
     void set_power(uint8_t power_level);
     // set the band and channel
@@ -251,7 +253,7 @@ private:
     void push_uint8_command_frame(uint8_t command, uint8_t data);
     void push_uint16_command_frame(uint8_t command, uint16_t data);
 
-    static void unpack_frequency(Settings *settings, const uint16_t frequency);
+    static void unpack_frequency(Settings *settings, uint16_t frequency);
     static void unpack_settings(Settings *settings, const SettingsResponseFrame *frame);
     static void unpack_settings(Settings *settings, const SettingsExtendedResponseFrame *frame);
 

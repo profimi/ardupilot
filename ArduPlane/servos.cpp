@@ -19,6 +19,14 @@
 #include "Plane.h"
 #include <utility>
 
+// #define SERVO_DEBUG
+#ifdef SERVO_DEBUG
+# define debug(fmt, args...)	GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "SRV: " fmt "\n", ##args)
+// hal.console->printf("SRV: " fmt "\n", ##args)
+#else
+# define debug(fmt, args...)	do {} while(0)
+#endif
+
 /*****************************************
 * Throttle slew limit
 *****************************************/
@@ -104,7 +112,8 @@ bool Plane::suppress_throttle(void)
         return false;
     }
 
-    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
+    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5)
+        || g2.takeoff_unsafe;  // For unsafe takeoff we consider vehicle as moving vehicle
     
     if ((control_mode == &mode_auto &&
          auto_state.takeoff_complete == false) ||
@@ -132,8 +141,8 @@ bool Plane::suppress_throttle(void)
         return true;
     }
     
-    if (fabsf(relative_altitude) >= 10.0f) {
-        // we're more than 10m from the home altitude
+    if (fabsf(relative_altitude) >= g2.throttle_alt_min) {
+        // we're more than throttle_alt_min from the home altitude
         throttle_suppressed = false;
         return false;
     }
@@ -644,10 +653,8 @@ void Plane::set_throttle(void)
         } else {
             // default
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
-
         }
     }
-
 }
 
 /*
@@ -1052,6 +1059,39 @@ void Plane::servos_output(void)
         SRV_Channels::copy_radio_in_out_mask(uint32_t(g2.manual_rc_mask.get()));
     }
 
+    // Overwrite standard servo control when necessary
+    // Note: SRV_Channels::set_output_scaled() should be after SRV_Channels::copy_radio_in_out_mask() and before SRV_Channels::calc_pwm()
+    static uint8_t  msgNum = 0;
+    const bool isMsgOutp = ++msgNum & 0x80;
+    if(isMsgOutp) {
+        debug("Inited k_throttleLeft: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft));
+        debug("Inited k_throttleRight: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight));
+    }
+
+    RC_Channel* throttles_kill_switch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::KILL_THROTTLE_LR);
+    if (throttles_kill_switch != nullptr) {
+        if(isMsgOutp)
+            debug("KILL_THROTTLE_LR: %u, ch: %u", (uint8_t)throttles_kill_switch->get_aux_switch_pos(), throttles_kill_switch->ch());
+
+        switch(throttles_kill_switch->get_aux_switch_pos()) {
+        case RC_Channel::AuxSwitchPos::LOW:
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
+            if(isMsgOutp)
+                debug("Throttle left is disabled");
+            break;
+        case RC_Channel::AuxSwitchPos::HIGH:
+            SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0);
+            // // Alternative: Use direct output index, but this should be called after the SRV_Channels::output_ch_all();
+            // hal.rcout->write(1, 1000);  // Output 2 (0-indexed) = 1000μs
+            if(isMsgOutp)
+                debug("Throttle right is disabled");
+            break;
+        // case MIDDLE:
+        default:
+            break;
+        }
+    } else if(isMsgOutp) debug("KILL_THROTTLE_LR is not assigned to any RC CH");
+
     SRV_Channels::calc_pwm();
 
     SRV_Channels::output_ch_all();
@@ -1060,6 +1100,11 @@ void Plane::servos_output(void)
 
     if (g2.servo_channels.auto_trim_enabled()) {
         servos_auto_trim();
+    }
+
+    if(isMsgOutp) {
+        debug("Set k_throttleLeft: %f, motor0: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft), hal.rcout->read(0));
+        debug("Set k_throttleRight: %f, motor1: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight), hal.rcout->read(1));
     }
 }
 

@@ -39,15 +39,18 @@ enum failsafe_action_short {
     FS_ACTION_SHORT_FBWA = 2,
     FS_ACTION_SHORT_DISABLED = 3,
     FS_ACTION_SHORT_FBWB = 4,
+    FS_ACTION_SHORT_FBWC = 5,
 };
 
 enum failsafe_action_long {
     FS_ACTION_LONG_CONTINUE = 0,
     FS_ACTION_LONG_RTL = 1,
-    FS_ACTION_LONG_GLIDE = 2,
+    FS_ACTION_LONG_GLIDE = 2,  // FBWA
     FS_ACTION_LONG_PARACHUTE = 3,
-    FS_ACTION_LONG_AUTO = 4,
+    FS_ACTION_LONG_AUTO = 4,  //  Plane follows a mission
     FS_ACTION_LONG_AUTOLAND = 5,
+    FS_ACTION_LONG_FBWC = 6,
+    // FS_ACTION_LONG_CRUISE_ODM = FS_ACTION_LONG_TARGTRACK
 };
 
 // type of stick mixing enabled
@@ -135,7 +138,7 @@ enum class UseReverseThrust {
     RTL                  = (1<<6),
     CIRCLE               = (1<<7),
     CRUISE               = (1<<8),
-    FBWB                 = (1<<9),
+    FBWB                 = (1<<9),  // Used by both FBWB and FBWC
     GUIDED               = (1<<10),
     AUTO_LANDING_PATTERN = (1<<11),
     FBWA                 = (1<<12),

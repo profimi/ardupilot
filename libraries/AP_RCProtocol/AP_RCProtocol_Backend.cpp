@@ -120,27 +120,8 @@ void AP_RCProtocol_Backend::decode_11bit_channels(const uint8_t* data, uint8_t n
 void AP_RCProtocol_Backend::configure_vtx(uint8_t band, uint8_t channel, uint8_t power, uint8_t pitmode)
 {
     AP_VideoTX& vtx = AP::vtx();
-    // VTX Band (0 = Fatshark, 1 = Raceband, 2 = E, 3 = B, 4 = A)
-    // map to TBS band A, B, E, Race, Airwave, LoRace
-    switch (band) {
-    case VTX_BAND_FATSHARK:
-        vtx.set_configured_band(AP_VideoTX::VideoBand::FATSHARK);
-        break;
-    case VTX_BAND_RACEBAND:
-        vtx.set_configured_band(AP_VideoTX::VideoBand::RACEBAND);
-        break;
-    case VTX_BAND_E_BAND:
-        vtx.set_configured_band(AP_VideoTX::VideoBand::BAND_E);
-        break;
-    case VTX_BAND_B_BAND:
-        vtx.set_configured_band(AP_VideoTX::VideoBand::BAND_B);
-        break;
-    case VTX_BAND_A_BAND:
-        vtx.set_configured_band(AP_VideoTX::VideoBand::BAND_A);
-        break;
-    default:
-        break;
-    }
+    vtx.set_configured_band(static_cast<AP_VideoTX::VideoBand>(band));
+
     // VTX Channel (0-7)
     vtx.set_configured_channel(channel);
     if (pitmode) {
@@ -150,13 +131,20 @@ void AP_RCProtocol_Backend::configure_vtx(uint8_t band, uint8_t channel, uint8_t
     }
 
     switch (power) {
+    case VTX_POWER_OFF:
+        vtx.set_configured_power_mw(0);
+        break;
     case VTX_POWER_1MW_14MW:
+        vtx.set_configured_power_mw(10);
+        break;
     case VTX_POWER_15MW_25MW:
         vtx.set_configured_power_mw(25);
         break;
     case VTX_POWER_26MW_99MW:
+        vtx.set_configured_power_mw(50);
+        break;
     case VTX_POWER_100MW_299MW:
-        vtx.set_configured_power_mw(100);
+        vtx.set_configured_power_mw(200);
         break;
     case VTX_POWER_300MW_600MW:
         vtx.set_configured_power_mw(400);
