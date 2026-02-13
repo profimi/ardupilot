@@ -688,7 +688,7 @@ public:
     void update_target_altitude() override {};
 
 protected:
-    float target_yaw = 0.0f;
+    float target_yaw = 0.0f;  // In rad
     bool _enter() override;
 };
 

@@ -362,7 +362,7 @@ void AP_GPS::init()
 void AP_GPS::convert_parameters()
 {
     // find GPS's top level key
-    uint16_t k_param_gps_key;
+    static uint16_t k_param_gps_key;
     if (!AP_Param::find_top_level_key_by_pointer(this, k_param_gps_key)) {
         return;
     }
