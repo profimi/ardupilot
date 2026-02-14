@@ -1,6 +1,6 @@
 #include "mode.h"
 #include "Plane.h"
-]
+
 bool ModeFBWC::_enter()
 {
 #if HAL_SOARING_ENABLED

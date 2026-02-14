@@ -17,7 +17,9 @@ Band band_P{{5653, 5693, 5733, 5773, 5813, 5853, 5893, 5933}, "P"};  // B Band P
 Band band_l{{5333, 5373, 5413, 5453, 5493, 5533, 5573, 5613}, "l"};  // C Band l of AKK, L of Fox10; AKK P
 Band band_U{{5325, 5348, 5366, 5384, 5402, 5420, 5438, 5456}, "U"};  // D Band U; AKK E
 Band band_O{{5474, 5492, 5510, 5528, 5546, 5564, 5582, 5600}, "O"};  // E Band O; AKK A
-Band band_C{{6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, "C"};  // F Band C, Custom
+Band band_C{{6028, 6054, 6002, 5658, 5925, 5556, 6080, 6100}, "C"};  // F Band C, Custom
+// Band band_C{{6002, 6028, 6054, 6080, 5945, 5658, 5362, 6100}, "C"};  // F Band C, Custom RapidFire
+// Band band_C{{6080, 6100, 5362, 5658, 5945, 6002, 6028, 6054}, "C"};  // F Band C, Custom Initial
 
 // TBS bands
 Band band_M{{5658, 5678, 5717, 5737, 5835, 5855, 5894, 5914}, "M"};  // 6 Band M
