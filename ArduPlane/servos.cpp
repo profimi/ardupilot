@@ -1090,7 +1090,7 @@ void Plane::servos_output(void)
         default:
             break;
         }
-    } else if(isMsgOutp) debug("KILL_THROTTLE_LR is not assigned to any RC CH");
+    } // else if(isMsgOutp) debug("KILL_THROTTLE_LR is not assigned to any RC CH");
 
     SRV_Channels::calc_pwm();
 

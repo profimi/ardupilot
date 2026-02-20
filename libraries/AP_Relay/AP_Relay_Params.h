@@ -44,6 +44,7 @@ public:
         DroneCAN_HARDPOINT_13 = 23,
         DroneCAN_HARDPOINT_14 = 24,
         DroneCAN_HARDPOINT_15 = 25,
+        RF_POWER = 26,  // RF (TX & VTX) power switch
         NUM_FUNCTIONS // must be the last entry
     };
 
@@ -67,8 +68,8 @@ public:
         DroneCAN_15 = 1015,
     };
 
-    AP_Enum<FUNCTION> function;            // relay function
-    AP_Int16 pin;                          // gpio pin number
+    AP_Enum<FUNCTION> function;           // relay function
+    AP_Int16 pin;                         // gpio pin number
     AP_Enum<DefaultState> default_state;  // default state
-    AP_Int8 inverted;                       // inverted signal
+    AP_Int8 inverted;                     // inverted signal
 };

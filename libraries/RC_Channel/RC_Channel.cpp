@@ -59,8 +59,17 @@ extern const AP_HAL::HAL& hal;
 #include <AP_VideoTX/AP_VideoTX.h>
 #include <AP_Torqeedo/AP_Torqeedo.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
-#include <AP_Parachute/AP_Parachute_config.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Scripting/AP_Scripting.h>
+
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+    #include <ArduPlane/Plane.h>
+    extern Plane plane;
+#elif APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+    #include <ArduCopter/Copter.h>
+    extern Copter copter;
+#endif
+
 #define SWITCH_DEBOUNCE_TIME_MS  200
 
 // // #define RC_CH_DEBUG
@@ -274,6 +283,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter, Rover, Plane, Blimp, Sub}:  218:Loweheiser throttle
     // @Values{Copter}: 219:Transmitter Tuning
     // @Values{Plane}: 240:Kill Throttle LR
+    // @Values{Plane}: 241:RF (TX & VTX) power swich relay control in specific operating modes for various vehicles
     // @Values{Plane}: 250:FBWB, 251:FBWC
     // @Values{All-Vehicles}: 300:Scripting1, 301:Scripting2, 302:Scripting3, 303:Scripting4, 304:Scripting5, 305:Scripting6, 306:Scripting7, 307:Scripting8, 308:Scripting9, 309:Scripting10, 310:Scripting11, 311:Scripting12, 312:Scripting13, 313:Scripting14, 314:Scripting15, 315:Scripting16
     // @Values{All-Vehicles}: 316:Stop-Restart Scripting
@@ -799,6 +809,7 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
     // Custom extensions
     case AUX_FUNC::KILL_THROTTLE_LR:
+    case AUX_FUNC::RF_POWER_SWITCH:  // Note: explicit initialization os optional for RF_POWER_SWITCH
         break;
 
     // these functions require explicit initialization
@@ -905,6 +916,7 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
     { AUX_FUNC::MOTOR_ESTOP,"MotorEStop"},
     { AUX_FUNC::MOTOR_INTERLOCK,"MotorInterlock"},
     { AUX_FUNC::KILL_THROTTLE_LR, "Kill Throttle L/R Switch"},
+    { AUX_FUNC::RF_POWER_SWITCH, "RF (TX & VTX) power swich relay control"},
 #if AP_SERVORELAYEVENTS_ENABLED && AP_RELAY_ENABLED
     { AUX_FUNC::RELAY2,"Relay2"},
     { AUX_FUNC::RELAY3,"Relay3"},
@@ -1518,6 +1530,131 @@ void RC_Channel::do_aux_function_retract_mount(const AuxSwitchPos ch_flag, const
 }
 #endif  // HAL_MOUNT_ENABLED
 
+
+void RC_Channel::do_aux_function_rf_power_switch(const AuxSwitchPos ch_flag)
+{
+    constexpr uint32_t REPORT_DTMS = 800;  // 800 ms; Should not exceed the power off time
+    static const uint8_t rf_on_time =  // Minimal time in sec for RF power on,0 means permanent on until changing the switching mode
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+        plane.g2.rf_power_on_time
+#else
+        1  // Note: 1 - infinit power on until the mode change is a safe option for newcomers
+#endif
+        ;
+    static AuxSwitchPos last_spos = AuxSwitchPos::LOW;
+    static uint32_t last_tms = 0;  // Last time in ms of the successful RF power switching
+    static uint32_t report_tms = 0;  // Last reporting time to avoid excessive logging
+    const uint32_t now_ms = AP_HAL::millis();
+
+    // Igore the same mode until swithing to another one
+    // Intentionally retain the power on for rf_on_time == 1 if the RF tumbler has not been switched to another position
+    if(last_spos == ch_flag && rf_on_time == 1) {
+        last_tms = now_ms;
+        return;
+    }
+
+    if(ch_flag == AuxSwitchPos::LOW) {
+        last_tms = now_ms;
+        last_spos = ch_flag;
+        // plane.failsafe.rc_failsafe_active = true;
+        return;
+    }
+
+    // Fetch vehicle singleton
+    AP_Vehicle *vehicle = AP::vehicle();
+    if(vehicle == nullptr)
+        return;  // Safety check
+    // Turn off the RF power for a limited time for non-manual modes only
+    // Note: FBWB is neither auto nor manual mode; vehicle->is_auto_mode(); vehicle->in_manual_mode()
+    const bool manual_mode =
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+        [&plane]() {
+            Mode::Number mode = plane.control_mode->mode_number();
+            return mode == Mode::Number::MANUAL
+                || mode == Mode::Number::ACRO
+                || mode == Mode::Number::TRAINING;
+        }()
+#elif APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+        [&copter]() {
+            Mode::Number current_mode = copter.flightmode->mode_number();
+            return mode == Mode::Number::ACRO
+                || mode == Mode::Number::STABILIZE
+                || mode == Mode::Number::DRIFT
+                || mode == Mode::Number::SPORT;
+        }()
+#else
+        // (vehicle->get_mode() < 5)
+        true  // Cannot reliably identify whether the mode is manual
+#endif
+        ;
+
+    if(manual_mode) {
+        if(now_ms - report_tms >= REPORT_DTMS) {
+            report_tms = now_ms;
+            GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "RF powering off is rejected in a Manual filght mode (%u)", vehicle->get_mode());
+        }
+        // plane.failsafe.rc_failsafe_active = true;
+        return;
+    }
+
+    // Ensure the RF power was available for at least several seconds if rf_on_time >= 1
+    // Fetch time since boot in milliseconds
+    const uint32_t  timeMin = (ch_flag != AuxSwitchPos::HIGH ?  // Power off time in minutes, 0 - disable (always on)
+#if APM_BUILD_TYPE(APM_BUILD_ArduCopter)    
+        plane.g2.rf_power_off_time1 : plane.g2.rf_power_off_time2
+#elif APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+        copter.g2.rf_power_off_time1 : copter.g2.rf_power_off_time2
+#else
+        // RF_POWER_OFF_TIME1 : RF_POWER_OFF_TIME2
+        2 : 12
+#endif
+    );
+    
+    if(last_spos == ch_flag && now_ms - last_tms < timeMin)
+        return;
+
+    last_spos = ch_flag;
+    last_tms = now_ms;
+
+    auto *const relay = AP::relay();
+    if(relay == nullptr) {
+        if(now_ms - report_tms >= REPORT_DTMS) {
+            report_tms = now_ms;
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "RF power switching fails: the relay is not available");
+        }
+        return;
+    } else if(now_ms - report_tms >= REPORT_DTMS) {
+        report_tms = now_ms;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "RF is powering off for %u min", timeMin);
+    }
+    if(!timeMin)
+        return;
+    AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, false);   // Turn off relay1; the same as set(0, false); off(0)
+    // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);
+
+//     // TODO: Disable failsafe modes for the intentional RF power interruption, however consider powering on RF by events: ALT_MIN, PITCH_MIN, ...
+//     // Note: this functionality requires modification of Failsafe logic in ArduPlane: events.cpp and/or system.cpp: see failsafe.state
+// #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+//     // 1. Mark the RC as "failsafe suppressed" to prevent 
+//     // the short/long failsafe actions from triggering.
+//     plane.failsafe.rc_failsafe_active = false;
+//     // plane.failsafe.rc_failsafe = false;
+//     // plane.failsafe.state = FAILSAFE_NONE;
+//
+//     // 2. Update the 'last valid RC' timestamp to now 
+//     // so the counter starts from zero only AFTER you turn it back on.
+//     plane.failsafe.last_valid_rc_ms = AP_HAL::millis();
+// #elif APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+//     copter.failsafe.rc_failsafe_active = false;
+// #endif
+
+    // Schedule a call to turn on the relay in x ms, and then turn off the relay
+    // const uint32_t  timeMs = (ch_flag != AuxSwitchPos::HIGH ? 2 : 10)*60*1000;
+    hal.scheduler->register_delay_callback([relay]() {
+        relay->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
+    }, timeMin*60*1000);
+}
+
 bool RC_Channel::run_aux_function(AUX_FUNC ch_option, AuxSwitchPos pos, AuxFuncTrigger::Source source, uint16_t source_index)
 {
 #if AP_SCRIPTING_ENABLED
@@ -1754,6 +1891,10 @@ bool RC_Channel::do_aux_function(const AuxFuncTrigger &trigger)
         break;
 
     case AUX_FUNC::KILL_THROTTLE_LR:
+        break;
+
+    case AUX_FUNC::RF_POWER_SWITCH:
+        do_aux_function_rf_power_switch(ch_flag);
         break;
 
 #if HAL_VISUALODOM_ENABLED

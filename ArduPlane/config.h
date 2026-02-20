@@ -233,3 +233,15 @@
 #ifndef THROTTLE_ALT_MIN
     #define THROTTLE_ALT_MIN 10.0f
 #endif
+
+#ifndef RF_POWER_OFF_TIME1
+    #define RF_POWER_OFF_TIME1 2
+#endif
+
+#ifndef RF_POWER_OFF_TIME2
+    #define RF_POWER_OFF_TIME2 12
+#endif
+
+#ifndef RF_POWER_ON_TIME
+    #define RF_POWER_ON_TIME 5  // 5 sec is a good value for experienced pilots to reduce RF emission still controlling the flight; 5-10 sec (0: disable, 1: infinity, 2..255 sec); Note: it takes around 2 sec to power on and enable VTX;
+#endif

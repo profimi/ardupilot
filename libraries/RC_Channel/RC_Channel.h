@@ -411,9 +411,12 @@ public:
 #endif  // AP_RC_TRANSMITTER_TUNING_ENABLED
 
         // Extra control functions
-        KILL_THROTTLE_LR =   240,  // Set the lowest value of throttle_l (RC switch LOW) / throttle_r (RC switch HIGHT), which are bound to motors x / y using relation 1:n
-        // KILL_MOTOR1 =        241,  // Set the lowest value of throttle for motor 1
-        // KILL_MOTOR2 =        242,  // Set the lowest value of throttle for motor 2
+        KILL_THROTTLE_LR =   240, // Set the lowest value of throttle_l (RC switch LOW) / throttle_r (RC switch HIGHT), which are bound to motors x / y using relation 1:n
+        // KILL_MOTOR1 =        241, // Set the lowest value of throttle for motor 1
+        // KILL_MOTOR2 =        242, // Set the lowest value of throttle for motor 2
+// #if HAL_RF_POWER_ENABLED
+        RF_POWER_SWITCH =    241, // RF (TX & VTX) power switch relay control in specific operating modes for various vehicles
+// #endif  // HAL_RF_POWER_ENABLED
 
         // inputs 248-249 are reserved for the Skybrush fork at
         // https://github.com/skybrush-io/ardupilot
@@ -531,6 +534,10 @@ protected:
     void do_aux_function_generator(const AuxSwitchPos ch_flag);
     void do_aux_function_fft_notch_tune(const AuxSwitchPos ch_flag);
     void do_aux_function_retract_mount(const AuxSwitchPos ch_flag, const uint8_t instance);
+
+    // Custom AUX functions
+    // RF (TX & VTX) power swich relay control in specific operating modes for various vehicles
+    void do_aux_function_rf_power_switch(const AuxSwitchPos ch_flag);
 
     typedef int8_t modeswitch_pos_t;
     virtual void mode_switch_changed(modeswitch_pos_t new_pos) {

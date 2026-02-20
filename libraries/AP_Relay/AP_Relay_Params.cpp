@@ -31,6 +31,7 @@ const AP_Param::GroupInfo AP_Relay_Params::var_info[] = {
     // @Values{AP_Periph}: 23: DroneCAN Hardpoint ID 13
     // @Values{AP_Periph}: 24: DroneCAN Hardpoint ID 14
     // @Values{AP_Periph}: 25: DroneCAN Hardpoint ID 15
+    // @Values{Plane, Copter}: 26: RF (TX & VTX) power swich relay control in specific operating modes for various vehicles
 
     // @User: Standard
     AP_GROUPINFO_FLAGS("FUNCTION", 1, AP_Relay_Params, function, (float)FUNCTION::NONE, AP_PARAM_FLAG_ENABLE),
