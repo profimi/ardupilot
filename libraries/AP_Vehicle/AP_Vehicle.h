@@ -315,6 +315,13 @@ public:
     virtual bool set_home(const Location& loc, bool lock) WARN_IF_UNUSED { return false; }
 #endif
 
+    // Custom members ----------------------------------------------------------
+#if AP_RELAY_ENABLED
+    /// @brief Temporary switches off RF (RX & VTX) to avoid radio emission
+    /// @param spos  RF switch position
+    virtual void rf_power_switch(RC_Channel::AuxSwitchPos spos) {}
+#endif  // AP_RELAY_ENABLED
+
 protected:
 
     virtual void init_ardupilot() = 0;

@@ -1074,6 +1074,103 @@ void Plane::update_quicktune(void)
 }
 #endif
 
+#if AP_RELAY_ENABLED
+void Plane::rf_power_switch(RC_Channel::AuxSwitchPos spos)
+{
+    constexpr uint32_t REPORT_DTMS = 800;  // 800 ms; Should not exceed the power off time
+    static RC_Channel::AuxSwitchPos last_spos = RC_Channel::AuxSwitchPos::LOW;
+    static uint32_t last_tms = 0;  // Last time in ms of the successful RF power switching
+    static uint32_t report_tms = 0;  // Last reporting time to avoid excessive logging
+    const uint8_t rf_on_time = g2.rf_power_on_time;  // Minimal time in sec for RF power on,0 means permanent on until changing the switching mode
+    const uint32_t now_ms = AP_HAL::millis();
+
+    // AP_Vehicle *veh = AP::vehicle();
+    // // veh->get_armed();
+    // // veh->get_mode_group();
+    // // veh->is_autonomous();
+    //
+    //     healthy(id)
+    // veh->baro().get_last_update(); get_altitude()
+    // veh->ins().get_gyro().
+
+    // Igore the same mode until swithing to another one
+    // Intentionally retain the power on for rf_on_time == 1 if the RF tumbler has not been switched to another position
+    if(last_spos == spos && rf_on_time == 1) {
+        last_tms = now_ms;
+        return;
+    }
+
+    if(spos == RC_Channel::AuxSwitchPos::LOW) {
+        last_tms = now_ms;
+        last_spos = spos;
+        // plane.failsafe.rc_failsafe_active = true;
+        return;
+    }
+
+    // Turn off the RF power for a limited time for non-manual modes only
+    // Note: FBWB is neither auto nor manual mode;
+    const bool manual_mode = [this]() {
+        const Mode::Number mode = control_mode->mode_number();
+        return mode == Mode::Number::MANUAL
+            || mode == Mode::Number::ACRO
+            || mode == Mode::Number::TRAINING;
+    }();
+
+    if(manual_mode) {
+        if(now_ms - report_tms >= REPORT_DTMS) {
+            report_tms = now_ms;
+            GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "RF powering off is rejected in a Manual filght mode (%u)", get_mode());
+        }
+        // plane.failsafe.rc_failsafe_active = true;
+        return;
+    }
+
+    // Ensure the RF power was available for at least several seconds if rf_on_time >= 1
+    // Fetch time since boot in milliseconds
+    const uint32_t  timeMin = spos != RC_Channel::AuxSwitchPos::HIGH  // Power off time in minutes, 0 - disable (always on)
+        ? plane.g2.rf_power_off_time1 : plane.g2.rf_power_off_time2;
+    
+    if(last_spos == spos && now_ms - last_tms < (timeMin * 60 + rf_on_time) * 1000)
+        return;
+
+    last_spos = spos;
+    last_tms = now_ms;
+
+    // auto *const relay = AP::relay();
+    if(now_ms - report_tms >= REPORT_DTMS) {
+        report_tms = now_ms;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "RF is powering off for %lu min", timeMin);
+    }
+    if(!timeMin)
+        return;
+    relay.set(AP_Relay_Params::FUNCTION::RF_POWER, false);   // Turn off relay1; the same as set(0, false); off(0)
+    // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);
+
+//     // TODO: Disable failsafe modes for the intentional RF power interruption, however consider powering on RF by events: ALT_MIN, PITCH_MIN, ...
+//     // Note: this functionality requires modification of Failsafe logic in ArduPlane: events.cpp and/or system.cpp: see failsafe.state
+// #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+//     // 1. Mark the RC as "failsafe suppressed" to prevent 
+//     // the short/long failsafe actions from triggering.
+//     plane.failsafe.rc_failsafe_active = false;
+//     // plane.failsafe.rc_failsafe = false;
+//     // plane.failsafe.state = FAILSAFE_NONE;
+//
+//     // 2. Update the 'last valid RC' timestamp to now 
+//     // so the counter starts from zero only AFTER you turn it back on.
+//     plane.failsafe.last_valid_rc_ms = AP_HAL::millis();
+// #elif APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+//     copter.failsafe.rc_failsafe_active = false;
+// #endif
+
+    // Schedule a call to turn on the relay in x ms, and then turn off the relay
+    // const uint32_t  timeMs = (spos != AuxSwitchPos::HIGH ? 2 : 10)*60*1000;
+    hal.scheduler->register_delay_callback([]() {
+        AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);  // TODO: scedule also validation for is_crashed(), dAlt, dPitch
+    }, timeMin*60*1000);
+    // TODO: consider starting beeping and VTX switching to max/min power (depending on battery and temp) on is_crashed()
+}
+#endif  // AP_RELAY_ENABLED
+
 /*
   constructor for main Plane class
  */

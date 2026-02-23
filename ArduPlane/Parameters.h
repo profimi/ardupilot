@@ -592,9 +592,11 @@ public:
 
     AP_Int8         takeoff_unsafe;
     AP_Float        throttle_alt_min;
+#if AP_RELAY_ENABLED
     AP_Int8         rf_power_off_time1;  // min
     AP_Int8         rf_power_off_time2;  // min
     AP_Int8         rf_power_on_time;  // sec (0: disable, 1: infinity, 2..255 sec)
+#endif  // AP_RELAY_ENABLED
 
 #if AP_RANGEFINDER_ENABLED
     // orientation of rangefinder to use for landing

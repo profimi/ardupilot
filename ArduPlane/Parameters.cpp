@@ -1298,6 +1298,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("THROTTLE_ALT_MIN", 47, ParametersG2, throttle_alt_min, THROTTLE_ALT_MIN),
 
+#if AP_RELAY_ENABLED
     // @Param: RF_POWER_OFF_TIME1
     // @DisplayName: RF (TX & VTX) power off mode 1 duration, min
     // @Description: RF (TX & VTX) power off duration in mode 1, minutes; 0 - disabled (always on)
@@ -1324,6 +1325,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("RF_POWER_ON_TIME", 48, ParametersG2, rf_power_on_time, RF_POWER_ON_TIME),
+#endif  // AP_RELAY_ENABLED
 
     AP_GROUPEND
 };
