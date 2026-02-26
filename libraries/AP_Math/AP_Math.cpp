@@ -377,6 +377,31 @@ Vector3f rand_vec3f(void)
     };
 }
 
+int32_t get_random_uniform(int16_t mean, uint16_t dev)
+{
+    return mean + (int32_t)roundf(rand_float() * dev);
+}
+
+#ifdef ADVANCE_MATH
+int32_t get_random_normal(int16_t mean, uint16_t std)
+{
+    // Box-Muller transform
+    // Generate two uniform random numbers [0, 1)
+    float u1 = get_random16() / 65536.0f;
+    float u2 = get_random16() / 65536.0f;
+    
+    // Avoid log(0)
+    if (u1 < 1e-6f)
+        u1 = 1e-6f;
+    
+    // Box-Muller formula
+    float z0 = sqrtf(-2.0f * logf(u1)) * cosf(2.0f * M_PI * u2);
+    
+    // Scale and shift to desired mean and std_dev
+    return mean + (int32_t)roundf(z0 * std)
+}
+#endif  // ADVANCE_MATH
+
 /*
   return true if two rotations are equivalent
   This copes with the fact that we have some duplicates, like ROLL_180_YAW_90 and PITCH_180_YAW_270

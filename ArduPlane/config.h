@@ -242,6 +242,22 @@
     #define RF_POWER_OFF_TIME2 12
 #endif
 
+#ifndef RF_POWER_DEV_TIME2
+    #define RF_POWER_DEV_TIME2 3
+#endif
+
 #ifndef RF_POWER_ON_TIME
     #define RF_POWER_ON_TIME 5  // 5 sec is a good value for experienced pilots to reduce RF emission still controlling the flight; 5-10 sec (0: disable, 1: infinity, 2..255 sec); Note: it takes around 2 sec to power on and enable VTX;
+#endif
+
+#ifndef RF_POWER_SAFE_ALT
+    #define RF_POWER_SAFE_ALT 12
+#endif
+
+#ifndef RF_POWER_SAFE_VSPEED
+    #define RF_POWER_SAFE_VSPEED 5
+#endif
+
+#ifndef RF_POWER_SAFE_PITCH
+    #define RF_POWER_SAFE_PITCH 20
 #endif

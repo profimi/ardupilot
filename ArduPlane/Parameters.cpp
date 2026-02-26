@@ -1299,33 +1299,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("THROTTLE_ALT_MIN", 47, ParametersG2, throttle_alt_min, THROTTLE_ALT_MIN),
 
 #if AP_RELAY_ENABLED
-    // @Param: RF_POWER_OFF_TIME1
-    // @DisplayName: RF (TX & VTX) power off mode 1 duration, min
-    // @Description: RF (TX & VTX) power off duration in mode 1, minutes; 0 - disabled (always on)
-    // @Range 0 255
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("RF_POWER_OFF_TIME1", 48, ParametersG2, rf_power_off_time1, RF_POWER_OFF_TIME1),
-
-    // @Param: RF_POWER_OFF_TIME2
-    // @DisplayName: RF (TX & VTX) power off mode 2 duration
-    // @Description: RF (TX & VTX) power off duration in mode 2, minutes; 0 - disabled (always on)
-    // @Range 0 255
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("RF_POWER_OFF_TIME2", 49, ParametersG2, rf_power_off_time2, RF_POWER_OFF_TIME2),
-
-    // @Param: RF_POWER_ON_TIME
-    // @DisplayName: RF (TX & VTX) power on minimal duration, sec
-    // @Description: RF (TX & VTX) power on minimal duration, seconds (0, 1, 5-10 are the typical values);
-    // 0 - disable the limitation (permanent off until the mode switching), 1 - infinity (permanent on until the mode switching),
-    // 5 is a good value for experienced pilots to reduce RF emission still controlling the flight;
-    // Note: it takes around 2 sec to power on and enable VTX
-    // @Range 0 255
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("RF_POWER_ON_TIME", 48, ParametersG2, rf_power_on_time, RF_POWER_ON_TIME),
-#endif  // AP_RELAY_ENABLED
+    // @Group: RFPW_
+    // @Path: rf_power.cpp
+    AP_SUBGROUPINFO(rf_pws, "RFPW_", 48, ParametersG2, RF_PowerSwitch),
+#endif
 
     AP_GROUPEND
 };

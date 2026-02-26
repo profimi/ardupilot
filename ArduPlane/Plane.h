@@ -117,6 +117,7 @@
 #endif
 
 #include "RC_Channel_Plane.h"     // RC Channel Library
+#include "rf_power.h"             // Must be included before the Parameters.h
 #include "Parameters.h"
 #if AP_ADSB_AVOIDANCE_ENABLED
 #include "avoidance_adsb.h"
@@ -1333,11 +1334,11 @@ public:
     }
    
     // Custom members ----------------------------------------------------------
-#if AP_RELAY_ENABLED
+#if RF_POWERSWITCH_ENABLED
     /// @brief Temporary switches off RF (RX & VTX) to avoid radio emission
     /// @param spos  RF switch position
     void rf_power_switch(RC_Channel::AuxSwitchPos spos) override;
-#endif  // AP_RELAY_ENABLED
+#endif
 };
 
 extern Plane plane;

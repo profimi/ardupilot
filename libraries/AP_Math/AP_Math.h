@@ -385,6 +385,20 @@ float rand_float(void);
 // generate a random Vector3f with each value between -1.0 and 1.0
 Vector3f rand_vec3f(void);
 
+/// @brief Uniform Distribution centered at a point with the dev deviation
+/// @param mean  - the mean of the Uniform Distribution
+/// @param dev  - the max deviation (range bound) of the Uniform Distribution
+/// @return 
+int32_t get_random_uniform(int16_t mean, uint16_t dev);
+
+#ifdef ADVANCE_MATH
+/// @brief Normal distribution
+/// @param mean  - the mean of the Normal distribution
+/// @param std  - standard deviation
+/// @return 
+int32_t get_random_normal(int16_t mean, uint16_t std) WARN_IF_UNUSED;
+#endif  // ADVANCE_MATH
+
 // return true if two rotations are equal
 bool rotation_equal(enum Rotation r1, enum Rotation r2) WARN_IF_UNUSED;
 
