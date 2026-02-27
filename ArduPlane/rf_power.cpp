@@ -87,8 +87,6 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
 RF_PowerSwitch::RF_PowerSwitch()
 : alt{0}, vspeed{0}, pitch{0}, rc_arm{RC_ARM_NONE}, off_time{0}, switch_time{0}, power{Power::ON}, text{0}
 {
-    // Turn on RF power relay
-    AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
     // Identify RC arming switch
     for(uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
         RC_Channel *chan = RC_Channels::rc_channel(i);
