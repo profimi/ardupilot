@@ -81,6 +81,14 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("SAFE_PITCH", 6, RF_PowerSwitch, safe_pitch, RF_POWER_SAFE_PITCH),
 
+    // @Param: CTL_GPIO
+    // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
+    // @Description: GPIO that de/activates the RF (TX & VTX) power switch for the integration with fiber optic controlled RF powering
+    // @Range 0 255
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("CTL_GPIO", 5, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+
     AP_GROUPEND
 };
 
@@ -115,8 +123,19 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 {
     static RC_Channel::AuxSwitchPos last_spos = RC_Channel::AuxSwitchPos::LOW;
     static uint32_t last_tms = 0;  // Last time in ms of the successful RF power switching
-    const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
 
+    // // Find the GPIO ID for Servo 10 (index 9)
+    // int8_t gpio_pin;
+    // if (!SRV_Channels::get_gpio(9, gpio_pin)) {
+    //     return; // Servo 10 is not capable of GPIO or not configured as -1
+    // }
+    // Returns 1 for HIGH (3.3V/5V), 0 for LOW (0V)
+    if(ctl_gpio != -1 && hal.gpio->read(ctl_gpio)) {
+        strncpy(text, "RF power switching is rejected by the HIGH ctl_gpio", sizeof(text));
+        return false;
+    }
+
+    const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
     // Igore the same mode until swithing to another one
     // Intentionally retain power on for rf_on_time == 1 if the RF tumbler has not been switched to another position
     if(last_spos == spos && is_on_infinite()) {  // permanent, continuous, standing

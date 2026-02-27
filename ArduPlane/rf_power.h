@@ -26,6 +26,7 @@ class RF_PowerSwitch {
     AP_Int16 safe_alt;  // m
     AP_Int8 safe_vspeed;  // m/s
     AP_Int8 safe_pitch;  // deg
+    AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
 
     int16_t alt;  // Current altitude
     int8_t vspeed;  // Current vspeed
