@@ -87,7 +87,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("CTL_GPIO", 5, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+    AP_GROUPINFO("CTL_GPIO", 7, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
 
     AP_GROUPEND
 };
@@ -131,7 +131,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // }
     // Returns 1 for HIGH (3.3V/5V), 0 for LOW (0V)
     if(ctl_gpio != -1 && hal.gpio->read(ctl_gpio)) {
-        strncpy(text, "RF power switching is rejected by the HIGH ctl_gpio", sizeof(text));
+        strncpy(text, "No RFPW switching: HIGH ctl_gpio", sizeof(text));
         return false;
     }
 
@@ -140,7 +140,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Intentionally retain power on for rf_on_time == 1 if the RF tumbler has not been switched to another position
     if(last_spos == spos && is_on_infinite()) {  // permanent, continuous, standing
         last_tms = now_ms;
-        strncpy(text, "RF power switching off is rejected by the infinite on_time=1", sizeof(text));
+        strncpy(text, "No RFPW switching: infinite on_time=1", sizeof(text));
         return false;
         // *text = 0;
         // return true;
@@ -148,10 +148,11 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
     if(spos == RC_Channel::AuxSwitchPos::LOW) {
         last_tms = now_ms;
+        // const bool switched = last_spos != spos;  // Note: This might be also the return movement of the switch when sticky mode is used
         last_spos = spos;
         // plane.failsafe.rc_failsafe_active = true;
         *text = 0;
-        return true;
+        return false;  // Note: the switching happens in periodic()
     }
 
     // Ensure the RF power was available for at least several seconds if rf_on_time >= 1
@@ -167,7 +168,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
     // Ensure it is safe to power off RF
     if(!is_safe()) {
-        hal.util->snprintf(text, sizeof(text), "RF powering off is rejected: unsafe (pitch: %u, alt: %u)", pitch, alt);
+        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %u, alt: %u)", pitch, alt);
         return false;
     }
 
@@ -175,10 +176,10 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     last_tms = now_ms;
 
     if(!off_time) {
-        strncpy(text, "RF power switching off for 0 min is omitted", sizeof(text));
+        strncpy(text, "No RFPW off: 0 min is omitted", sizeof(text));
         return false;  // There is no much sense to notify about omission of power of for 0 min
     }
-    hal.util->snprintf(text, sizeof(text), "RF is powering off for %u min %u sec", off_time / 60, off_time % 60);
+    hal.util->snprintf(text, sizeof(text), "RFPW is off for %u min %u sec", off_time / 60, off_time % 60);
     power = Power::DEACTIVATING;
     switch_time = now_ms;
     return true;
@@ -212,7 +213,7 @@ void RF_PowerSwitch::periodic()
             
             float vel = 0;
             if(!ahrs.get_velocity_D(vel)) {
-                ;  // This is an estimated value, which might be inaccurate of invalid
+                // This is an estimated value, which might be inaccurate of invalid
             }
             vspeed = -roundf(vel);
 
@@ -220,7 +221,7 @@ void RF_PowerSwitch::periodic()
         }
 
         if(!is_safe()) {
-            hal.util->snprintf(text, sizeof(text), "Emergency switching power on: safety violation: alt: %d, vspeed: %d, pitch: %d, crit_bar: %u, crashed: %u",
+            hal.util->snprintf(text, sizeof(text), "Emergency RFPW on: alt: %d, vspeed: %d, pitch: %d, crit_bar: %u, crashed: %u",
                 alt, vspeed, pitch, is_battery_critical(), plane.is_crashed());
         } else if(now_ms < switch_time + off_time * 1000) {
             // Prefent failsafe mode in the RF POWER_OFF state by automatically sending the arming signal

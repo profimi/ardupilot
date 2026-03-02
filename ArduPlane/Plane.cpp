@@ -1081,7 +1081,7 @@ void Plane::update_quicktune(void)
 #if RF_POWERSWITCH_ENABLED
 void Plane::rf_power_switch(RC_Channel::AuxSwitchPos spos)
 {
-    constexpr uint32_t REPORT_DTMS = 800;  // 800 ms; Should not exceed the power off time
+    constexpr uint32_t REPORT_DTMS = 600;  // ms; Should not exceed the power off time (1+ sec)
     static uint32_t report_tms = 0;  // Last reporting time to avoid excessive logging
     const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
 
@@ -1097,7 +1097,7 @@ void Plane::rf_power_switch(RC_Channel::AuxSwitchPos spos)
     if(manual_mode) {
         if(now_ms - report_tms >= REPORT_DTMS) {
             report_tms = now_ms;
-            GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "RF powering off is rejected in a Manual filght mode (%u)", get_mode());
+            GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "No RFPW off: manual modes (%u)", get_mode());
         }
         // plane.failsafe.rc_failsafe_active = true;
         return;
@@ -1105,7 +1105,7 @@ void Plane::rf_power_switch(RC_Channel::AuxSwitchPos spos)
 
     const bool switched = g2.rf_pws.process(spos);
     // Report the power swtiching result, including the expected power on time to the GCS
-    if(now_ms - report_tms >= REPORT_DTMS) {
+    if((now_ms - report_tms >= REPORT_DTMS || switched)) {
         report_tms = now_ms;
         const char* msg = g2.rf_pws.msg();
         if(msg) {
