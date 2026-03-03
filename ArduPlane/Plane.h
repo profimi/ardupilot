@@ -1338,6 +1338,9 @@ public:
     /// @brief Temporary switches off RF (RX & VTX) to avoid radio emission
     /// @param spos  RF switch position
     void rf_power_switch(RC_Channel::AuxSwitchPos spos) override;
+
+    /// @brief Init RF (RX & VTX) power switch, powering it on and disabling the failsafe to prevent flight mode change if necessary
+    void rf_power_switch_init() override { g2.rf_pws.init(&g.throttle_fs_enabled); }
 #endif
 };
 

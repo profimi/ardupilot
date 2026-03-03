@@ -1095,7 +1095,7 @@ void Plane::rf_power_switch(RC_Channel::AuxSwitchPos spos)
     }();
 
     if(manual_mode) {
-        if(now_ms - report_tms >= REPORT_DTMS) {
+        if(now_ms - report_tms >= REPORT_DTMS) {    
             report_tms = now_ms;
             GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "No RFPW off: manual modes (%u)", get_mode());
         }

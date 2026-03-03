@@ -320,6 +320,9 @@ public:
     /// @brief Temporary switches off RF (RX & VTX) to avoid radio emission
     /// @param spos  RF switch position
     virtual void rf_power_switch(RC_Channel::AuxSwitchPos spos) {}
+
+    /// @brief Init RF (RX & VTX) power switch, powering it on
+    virtual void rf_power_switch_init() { AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true); }
 #endif  // AP_RELAY_ENABLED
 
 protected:

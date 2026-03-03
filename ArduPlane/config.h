@@ -265,3 +265,7 @@
 #ifndef RF_POWER_CTL_GPIO
     #define RF_POWER_CTL_GPIO 59  // Servo10 pin
 #endif
+
+#ifndef RF_POWER_OFF_NOFS
+    #define RF_POWER_OFF_NOFS 0  // false
+#endif

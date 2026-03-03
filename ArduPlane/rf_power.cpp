@@ -81,32 +81,49 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("SAFE_PITCH", 6, RF_PowerSwitch, safe_pitch, RF_POWER_SAFE_PITCH),
 
+    // // @Param: RC_FUNC
+    // // @DisplayName: Mocking RC function
+    // // @Description: Mocking RC function (either an unused one or arming; Ardupilot includes hundreds of them)
+    // // @Range -32767 32767
+    // // @Increment: 1
+    // // @User: Standard
+    // AP_GROUPINFO("RC_FUNC", 7, RF_PowerSwitch, rc_func, RC_Channel::AUX_FUNC::ARMDISARM),
+
     // @Param: CTL_GPIO
     // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
     // @Description: GPIO that de/activates the RF (TX & VTX) power switch for the integration with fiber optic controlled RF powering
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("CTL_GPIO", 7, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+    AP_GROUPINFO("CTL_GPIO", 8, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+
+    // @Param: OFF_NOFS
+    // @DisplayName: Disable failsafe triggering on powering off RF communication
+    // @Description: Disable failsafe triggering when RF communication is powered off to retain current flight mode
+    // @Range 0 1
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("OFF_NOFS", 9, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
     AP_GROUPEND
 };
 
 RF_PowerSwitch::RF_PowerSwitch()
-: alt{0}, vspeed{0}, pitch{0}, rc_arm{RC_ARM_NONE}, off_time{0}, switch_time{0}, power{Power::ON}, text{0}
+: alt{0}, vspeed{0}, pitch{0}  // , rc_mock{RC_MOCK_NONE}
+, off_time{0}, switch_time{0}, power{Power::ON}, text{0}, failsafe(nullptr)
 {
-    // Identify RC arming switch
-    for(uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
-        RC_Channel *chan = RC_Channels::rc_channel(i);
-        if (chan == nullptr)
-            continue;
-
-        // Check if this channel is assigned to ARM_DISARM (Option 153)
-        if (chan->option == (uint16_t)RC_Channel::AUX_FUNC::ARMDISARM) {
-            rc_arm = i;
-            break; // Found it, stop searching
-        }
-    }
+    // // Identify RC arming switch
+    // for(uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
+    //     RC_Channel *chan = RC_Channels::rc_channel(i);
+    //     if (chan == nullptr)
+    //         continue;
+    //
+    //     // Check if this channel is assigned to ARM_DISARM (Option 153)
+    //     if (chan->option == (uint16_t)rc_func) {
+    //         rc_mock = i;
+    //         break; // Found it, stop searching
+    //     }
+    // }
 }
 
 bool RF_PowerSwitch::is_safe() const
@@ -117,6 +134,13 @@ bool RF_PowerSwitch::is_safe() const
 bool RF_PowerSwitch::is_critical() const
 {
     return plane.is_crashed() || is_battery_critical();
+}
+
+void RF_PowerSwitch::init(AP_Enum<Failsafe>* rf_failsafe)
+{
+    // if(off_nofs)  // Note: Ignore this flag here to enabling dynamic control by this flag
+    failsafe = rf_failsafe;
+    AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
 }
 
 bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
@@ -187,17 +211,37 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
 void RF_PowerSwitch::periodic()
 {
+    static Failsafe failsafe_orig;
     // Check crash status
     const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
     switch(power) {
     case Power::DEACTIVATING:
         // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
-        if(now_ms < switch_time + 50)
+        if(now_ms < switch_time + POWEROFF_DELAY)  // Note: 50ms  is not sufficient for GSC reporting
             break;
         power = Power::OFF;
         switch_time = now_ms;
         AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, false);
         // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);  // However, that call is slow
+        // Disable the failsafe state if necessary
+        if(off_nofs && failsafe) {
+            failsafe_orig = *failsafe;
+            failsafe->set(Failsafe::EnabledNoFS);  // That is throttle_fs_enabled
+
+            // // FS_GCS_ENABLE = 0   // Disable GCS failsafe entirely
+            // // FS_LONG_TIMEOUT = 0 // Disable long failsafe
+            // // plane.g.throttle_failsafe.set_and_save(0);
+            //
+            // // Handles physicall loss of RF connectifity
+            // plane.g.throttle_fs_enabled = Failsafe::EnabledNoFS;
+            //
+            // // Prevent GCS failsafe from triggering by updating heartbeat timestamp (prevents timeout)
+            // plane.failsafe.last_heartbeat_ms = AP_HAL::millis();
+            // // // Directly disable GCS failsafe flag
+            // // plane.failsafe.gcs = false;
+            // // Prevent RC failsafe if using physical RC link
+            // plane.failsafe.last_valid_rc_ms = AP_HAL::millis();
+        }
         // Seamlessly switching to the power off
         FALLTHROUGH;
     case Power::OFF:
@@ -225,8 +269,8 @@ void RF_PowerSwitch::periodic()
                 alt, vspeed, pitch, is_battery_critical(), plane.is_crashed());
         } else if(now_ms < switch_time + off_time * 1000) {
             // Prefent failsafe mode in the RF POWER_OFF state by automatically sending the arming signal
-            if(rc_arm != RC_ARM_NONE)
-                RC_Channels::set_override(rc_arm, RC_Channels::rc_channel(rc_arm)->get_radio_max());
+            // if(rc_mock != RC_MOCK_NONE)
+            //     RC_Channels::set_override(rc_mock, RC_Channels::rc_channel(rc_mock)->get_radio_max());
             break;
         }
         // Seamlessly switching to the power activation
@@ -235,6 +279,9 @@ void RF_PowerSwitch::periodic()
         AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
         power = Power::ON;
         switch_time = now_ms;
+        // Recover the failsafe mode if it was diabled on power deactivation
+        if(off_nofs && failsafe)
+            failsafe->set(failsafe_orig);
         break;
     default:
         if(is_critical()) {
@@ -251,6 +298,5 @@ void RF_PowerSwitch::periodic()
         }
         break;
     }
-
 }
 #endif  // RF_POWERSWITCH_ENABLED

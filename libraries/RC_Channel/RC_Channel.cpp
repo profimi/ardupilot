@@ -801,10 +801,10 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
     // Custom extensions
     case AUX_FUNC::KILL_THROTTLE_LR:
-    case AUX_FUNC::RF_POWER_SWITCH:  // Note: explicit initialization os optional for RF_POWER_SWITCH
         break;
 
     // these functions require explicit initialization
+    case AUX_FUNC::RF_POWER_SWITCH:  // The initialization ensures the power on state on start
 #if HAL_ADSB_ENABLED
     case AUX_FUNC::AVOID_ADSB:
 #endif
@@ -1522,16 +1522,6 @@ void RC_Channel::do_aux_function_retract_mount(const AuxSwitchPos ch_flag, const
 }
 #endif  // HAL_MOUNT_ENABLED
 
-
-void RC_Channel::do_aux_function_rf_power_switch(const AuxSwitchPos ch_flag)
-{
-    // Fetch vehicle singleton
-    AP_Vehicle *const vehicle = AP::vehicle();
-    if(vehicle != nullptr)  // Safety check
-        vehicle->rf_power_switch(ch_flag);
-    // else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "AP::vehicle() instance does not exist");
-}
-
 bool RC_Channel::run_aux_function(AUX_FUNC ch_option, AuxSwitchPos pos, AuxFuncTrigger::Source source, uint16_t source_index)
 {
 #if AP_SCRIPTING_ENABLED
@@ -1770,9 +1760,15 @@ bool RC_Channel::do_aux_function(const AuxFuncTrigger &trigger)
     case AUX_FUNC::KILL_THROTTLE_LR:
         break;
 
-    case AUX_FUNC::RF_POWER_SWITCH:
-        do_aux_function_rf_power_switch(ch_flag);
+    case AUX_FUNC::RF_POWER_SWITCH: {
+        // Enusure powering on the relay in the initialization mode, where the the flight mode might be manual
+        // (other might not be initialized yet). So, there is no sense to call power switching in that case
+        AP_Vehicle& vehicle = *AP::vehicle();
+        if(trigger.source != AuxFuncTrigger::Source::INIT)
+            vehicle.rf_power_switch(ch_flag);
+        else vehicle.rf_power_switch_init();  // Turn on the switch and disable the failsafe in the off mode if necessary
         break;
+    }
 
 #if HAL_VISUALODOM_ENABLED
     case AUX_FUNC::VISODOM_ALIGN:

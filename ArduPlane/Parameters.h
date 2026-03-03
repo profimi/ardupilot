@@ -36,11 +36,7 @@ public:
     static const uint16_t k_format_version = 13;
     //////////////////////////////////////////////////////////////////
 
-    enum class ThrFailsafe {
-        Disabled    = 0,
-        Enabled     = 1,
-        EnabledNoFS = 2
-    };
+    using ThrFailsafe = RF_PowerSwitch::Failsafe;
 
     enum {
         // Layout version number, always key zero.

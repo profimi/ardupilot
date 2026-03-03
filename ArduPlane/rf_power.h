@@ -10,35 +10,22 @@
 #define RF_POWERSWITCH_ENABLED 1
 #endif
 
-enum class Power: uint8_t {
-    OFF,
-    ON,
-    ACTIVATING,
-    DEACTIVATING,
-};
-
 class RF_PowerSwitch {
-    // Parameters
-    AP_Int8 off_time1;  // min
-    AP_Int8 off_time2;  // min
-    AP_Int8 dev_time2;  // min, < off_time2
-    AP_Int8 on_time;  // sec (0: disable, 1: infinity, 2..255 sec)
-    AP_Int16 safe_alt;  // m
-    AP_Int8 safe_vspeed;  // m/s
-    AP_Int8 safe_pitch;  // deg
-    AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
-
-    int16_t alt;  // Current altitude
-    int8_t vspeed;  // Current vspeed
-    int8_t pitch;  // Current pitch angle, deg, negative ground inclination (down is negative)
-    uint8_t rc_arm;  // Arming RC channel
-    uint16_t off_time;  // Scheduling power off time, sec
-    uint32_t switch_time;  // Power switching time, ms
-    Power power;  // Whether in the power state, when safety checks should be activated
-    char text[0xFF];
-
-    static constexpr decltype(RF_PowerSwitch::rc_arm)  RC_ARM_NONE = -1;
 public:
+    enum class Power: uint8_t {
+        OFF,
+        ON,
+        ACTIVATING,
+        DEACTIVATING,
+    };
+
+    // CAUTION: This class is refactored from Parameters::ThrFailsafe and used heavily in Parameters
+    enum class Failsafe: uint8_t {
+        Disabled    = 0,
+        Enabled     = 1,
+        EnabledNoFS = 2
+    };
+
     static const struct AP_Param::GroupInfo var_info[];
 
     RF_PowerSwitch();
@@ -56,6 +43,14 @@ public:
     /// @return Whether the vehicle state is critical (unsafe); buzzer is enabled and the VTX power might be reduced
     bool is_critical() const;
 
+    /// @brief Failsafe is disabled in powered off RF switch
+    /// @return Failsafe is disabled when RF communication is powered off to retain the flight mode
+    bool is_nofailsafe() const  { return off_nofs; }
+
+    /// @brief Init the RF poweroff swich, powering it on start and providing the failsafe state control on switching
+    /// @param[in, out] rf_failsafe  - RF failsafe state
+    void init(AP_Enum<Failsafe>* rf_failsafe);
+
     /// @brief Process RC signal to switch the RF power
     /// @param spos  - RC switch position
     /// @return whether the power was switched
@@ -67,6 +62,32 @@ public:
     /// @brief Processing result message
     /// @return textual description of the last process() call result
     const char *msg() const  { return text; }
+private:
+    // Parameters
+    AP_Int8 off_time1;  // min
+    AP_Int8 off_time2;  // min
+    AP_Int8 dev_time2;  // min, < off_time2
+    AP_Int8 on_time;  // sec (0: disable, 1: infinity, 2..255 sec)
+    AP_Int16 safe_alt;  // m
+    AP_Int8 safe_vspeed;  // m/s
+    AP_Int8 safe_pitch;  // deg
+    // AP_Int16 rc_func;  // Mocking RC function (either an unused one or arming; Ardupilot includes hundreds of them)
+    AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
+    AP_Int8 off_nofs;  // Disable failsafe triggering on powering off RF communication
+
+    int16_t alt;  // Current altitude
+    int8_t vspeed;  // Current vspeed
+    int8_t pitch;  // Current pitch angle, deg, negative ground inclination (down is negative)
+    // uint8_t rc_mock;  // Mocking RC channel (either an unused one or arming) to prevent switching to the failsafe mode on power off
+    uint16_t off_time;  // Scheduling power off time, sec
+    uint32_t switch_time;  // Power switching time, ms
+    Power power;  // Whether in the power state, when safety checks should be activated
+    char text[0xFF];
+    AP_Enum<Failsafe>* failsafe;  // Vehicle hardware RF failsafe enabling flag
+
+    // static constexpr decltype(RF_PowerSwitch::rc_mock)  RC_MOCK_NONE = -1;
+    // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
+    static constexpr uint16_t  POWEROFF_DELAY = 200;  // ms; poweroff delay (latency) to ensure the notification is passed to the GS, including the power off duration
 };
 
 #endif  // AP_RELAY_ENABLED
