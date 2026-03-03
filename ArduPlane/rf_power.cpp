@@ -11,7 +11,7 @@
 #include "Plane.h"
 
 extern const AP_HAL::HAL& hal;  // Required for snprintf()
-extern Plane plane;  // Required for the optional crash check
+// extern Plane plane;  // Required for the optional crash check
 
 /// @brief Whether the battery state is critical
 /// @return Whether the vehicle battery state is critical
@@ -91,7 +91,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
 
     // @Param: CTL_GPIO
     // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
-    // @Description: GPIO that de/activates the RF (TX & VTX) power switch for the integration with fiber optic controlled RF powering
+    // @Description: GPIO that de/activates the RF (TX & VTX) power switch for the integration with fiber optic controlled RF powering; -1 = 255 - disabled
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
@@ -109,22 +109,9 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
 };
 
 RF_PowerSwitch::RF_PowerSwitch()
-: alt{0}, vspeed{0}, pitch{0}  // , rc_mock{RC_MOCK_NONE}
-, off_time{0}, switch_time{0}, power{Power::ON}, text{0}, failsafe(nullptr)
-{
-    // // Identify RC arming switch
-    // for(uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
-    //     RC_Channel *chan = RC_Channels::rc_channel(i);
-    //     if (chan == nullptr)
-    //         continue;
-    //
-    //     // Check if this channel is assigned to ARM_DISARM (Option 153)
-    //     if (chan->option == (uint16_t)rc_func) {
-    //         rc_mock = i;
-    //         break; // Found it, stop searching
-    //     }
-    // }
-}
+: alt{0}, vspeed{0}, pitch{0}, off_time{0}, switch_time{0}, power{Power::ON}
+, text{0}, failsafe(nullptr), is_crashed(nullptr)
+{}
 
 bool RF_PowerSwitch::is_safe() const
 {
@@ -133,13 +120,14 @@ bool RF_PowerSwitch::is_safe() const
 
 bool RF_PowerSwitch::is_critical() const
 {
-    return plane.is_crashed() || is_battery_critical();
+    return (is_crashed && *is_crashed) || is_battery_critical();
 }
 
-void RF_PowerSwitch::init(AP_Enum<Failsafe>* rf_failsafe)
+void RF_PowerSwitch::init(AP_Enum<Failsafe>* rf_failsafe, bool* crashed)
 {
     // if(off_nofs)  // Note: Ignore this flag here to enabling dynamic control by this flag
     failsafe = rf_failsafe;
+    is_crashed = crashed;
     AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
 }
 
@@ -192,7 +180,8 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
     // Ensure it is safe to power off RF
     if(!is_safe()) {
-        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %u, alt: %u)", pitch, alt);
+        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
+            , pitch, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
         return false;
     }
 
@@ -253,26 +242,22 @@ void RF_PowerSwitch::periodic()
             ahrs.get_relative_position_D_home(alt_home);  // get_velocity_D; getCorrectedDeltaVelocityNED; get_velocity_NED
             // AP::ahrs().get_location(loc)
             // alt_home = loc.alt * 0.01f;  // Convert cm to meters
-            alt = -roundf(alt_home);
+            alt = -roundf(alt_home);  // constrain_float(alt_home, INT16_MIN, INT16_MAX)
             
             float vel = 0;
             if(!ahrs.get_velocity_D(vel)) {
                 // This is an estimated value, which might be inaccurate of invalid
             }
-            vspeed = -roundf(vel);
+            vspeed = -roundf(vel);  // constrain_float(vel, INT8_MIN, INT8_MAX)
 
             pitch = ahrs.get_pitch_deg();  // Negative for descend
         }
 
         if(!is_safe()) {
-            hal.util->snprintf(text, sizeof(text), "Emergency RFPW on: alt: %d, vspeed: %d, pitch: %d, crit_bar: %u, crashed: %u",
-                alt, vspeed, pitch, is_battery_critical(), plane.is_crashed());
-        } else if(now_ms < switch_time + off_time * 1000) {
-            // Prefent failsafe mode in the RF POWER_OFF state by automatically sending the arming signal
-            // if(rc_mock != RC_MOCK_NONE)
-            //     RC_Channels::set_override(rc_mock, RC_Channels::rc_channel(rc_mock)->get_radio_max());
+            hal.util->snprintf(text, sizeof(text), "Emergency RFPW on: alt: %d, vspeed: %d, pitch: %d, crbat: %u, crash: %u",
+                alt, vspeed, pitch, is_battery_critical(), is_crashed && *is_crashed);
+        } else if(now_ms < switch_time + off_time * 1000)
             break;
-        }
         // Seamlessly switching to the power activation
         FALLTHROUGH;
     case Power::ACTIVATING:

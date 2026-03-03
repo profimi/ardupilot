@@ -119,12 +119,12 @@ void RC_Channel_Plane::mode_switch_changed(modeswitch_pos_t new_pos)
 {
     if (new_pos < 0 || (uint8_t)new_pos > plane.num_flight_modes) {
         // should not have been called
-        gcs().send_text(MAV_SEVERITY_NOTICE, "Invalid flight mode requered: %u (>%u)",
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Invalid flight mode requested: %u (>%u)",
             static_cast<uint8_t>(new_pos), plane.num_flight_modes);
         return;
     }
 
-    gcs().send_text(MAV_SEVERITY_DEBUG, "mode_switch_changed(): setting mode #%u", new_pos);
+    gcs().send_text(MAV_SEVERITY_DEBUG, "mode_switch_changed(): flight mode #%u", new_pos);
     plane.set_mode_by_number((Mode::Number)plane.flight_modes[new_pos].get(), ModeReason::RC_COMMAND);
 }
 

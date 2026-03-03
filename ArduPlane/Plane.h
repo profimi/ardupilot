@@ -1340,7 +1340,7 @@ public:
     void rf_power_switch(RC_Channel::AuxSwitchPos spos) override;
 
     /// @brief Init RF (RX & VTX) power switch, powering it on and disabling the failsafe to prevent flight mode change if necessary
-    void rf_power_switch_init() override { g2.rf_pws.init(&g.throttle_fs_enabled); }
+    void rf_power_switch_init() override { g2.rf_pws.init(&g.throttle_fs_enabled, &crash_state.is_crashed); }
 #endif
 };
 

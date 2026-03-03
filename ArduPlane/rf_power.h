@@ -49,7 +49,8 @@ public:
 
     /// @brief Init the RF poweroff swich, powering it on start and providing the failsafe state control on switching
     /// @param[in, out] rf_failsafe  - RF failsafe state
-    void init(AP_Enum<Failsafe>* rf_failsafe);
+    /// @param[in] crashed  - whether the vehicle is crashed
+    void init(AP_Enum<Failsafe>* rf_failsafe, bool* crashed);
 
     /// @brief Process RC signal to switch the RF power
     /// @param spos  - RC switch position
@@ -68,7 +69,7 @@ private:
     AP_Int8 off_time2;  // min
     AP_Int8 dev_time2;  // min, < off_time2
     AP_Int8 on_time;  // sec (0: disable, 1: infinity, 2..255 sec)
-    AP_Int16 safe_alt;  // m
+    AP_Int16 safe_alt;  // m relative to the home point or absolute (relying on the barometer)
     AP_Int8 safe_vspeed;  // m/s
     AP_Int8 safe_pitch;  // deg
     // AP_Int16 rc_func;  // Mocking RC function (either an unused one or arming; Ardupilot includes hundreds of them)
@@ -78,16 +79,16 @@ private:
     int16_t alt;  // Current altitude
     int8_t vspeed;  // Current vspeed
     int8_t pitch;  // Current pitch angle, deg, negative ground inclination (down is negative)
-    // uint8_t rc_mock;  // Mocking RC channel (either an unused one or arming) to prevent switching to the failsafe mode on power off
     uint16_t off_time;  // Scheduling power off time, sec
     uint32_t switch_time;  // Power switching time, ms
     Power power;  // Whether in the power state, when safety checks should be activated
     char text[0xFF];
     AP_Enum<Failsafe>* failsafe;  // Vehicle hardware RF failsafe enabling flag
+    const bool* is_crashed;  // Whether the vehicle is crashed
 
-    // static constexpr decltype(RF_PowerSwitch::rc_mock)  RC_MOCK_NONE = -1;
     // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
-    static constexpr uint16_t  POWEROFF_DELAY = 200;  // ms; poweroff delay (latency) to ensure the notification is passed to the GS, including the power off duration
+    // 200 ms is also not always sufficient
+    static constexpr uint16_t  POWEROFF_DELAY = 300;  // ms; poweroff delay (latency) to ensure the notification is passed to the GS, including the power off duration
 };
 
 #endif  // AP_RELAY_ENABLED
