@@ -150,23 +150,33 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
             set_mode(mode_fbwa, reason); // emergency landing switch overrides normal action to allow out of range landing
             break;
         }
-        if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
-#if HAL_PARACHUTE_ENABLED
-            parachute_release();
-#endif
-        } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
+
+        switch(g.fs_action_long) {
+        case FS_ACTION_LONG_CONTINUE:
+            break;
+        case FS_ACTION_LONG_GLIDE:
             set_mode(mode_fbwa, reason);
-        } else if (g.fs_action_long == FS_ACTION_LONG_AUTO) {
+            break;
+#if HAL_PARACHUTE_ENABLED
+        case FS_ACTION_LONG_PARACHUTE:
+            parachute_release();
+            break;
+#endif  // HAL_PARACHUTE_ENABLED
+        case FS_ACTION_LONG_AUTO:
             set_mode(mode_auto, reason);
+            break;
 #if MODE_AUTOLAND_ENABLED
-        } else if (g.fs_action_long == FS_ACTION_LONG_AUTOLAND) {
+        case FS_ACTION_LONG_AUTOLAND:
             if (!set_mode(mode_autoland, reason)) {
                set_mode(mode_rtl, reason);
             }
-#endif
-        } else if (g.fs_action_long == FS_ACTION_LONG_FBWC) {
+            break;
+#endif  // MODE_AUTOLAND_ENABLED
+        case FS_ACTION_LONG_FBWC:
             set_mode(mode_fbwc, reason);
-        } else {
+            break;
+        case FS_ACTION_LONG_RTL:
+        default:
             set_mode(mode_rtl, reason);
         }
         break;
@@ -203,26 +213,36 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
         }
 #endif
         FALLTHROUGH;
-
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
-
-        if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
-#if HAL_PARACHUTE_ENABLED
-            parachute_release();
-#endif
-        } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
+        switch(g.fs_action_long) {
+        case FS_ACTION_LONG_RTL:
+            set_mode(mode_rtl, reason);
+            break;
+        case FS_ACTION_LONG_GLIDE:
             set_mode(mode_fbwa, reason);
-        } else if (g.fs_action_long == FS_ACTION_LONG_AUTO) {
+            break;
+#if HAL_PARACHUTE_ENABLED
+        case FS_ACTION_LONG_PARACHUTE:
+            parachute_release();
+            break;
+#endif  // HAL_PARACHUTE_ENABLED
+        case FS_ACTION_LONG_AUTO:
             set_mode(mode_auto, reason);
+            break;
 #if MODE_AUTOLAND_ENABLED
-        } else if (g.fs_action_long == FS_ACTION_LONG_AUTOLAND) {
+        case FS_ACTION_LONG_AUTOLAND:
             if (!set_mode(mode_autoland, reason)) {
                set_mode(mode_rtl, reason);
-            } 
-#endif           
-        } else if (g.fs_action_long == FS_ACTION_LONG_RTL) {
-            set_mode(mode_rtl, reason);
+            }
+            break;
+#endif  // MODE_AUTOLAND_ENABLED
+        case FS_ACTION_LONG_FBWC:
+            set_mode(mode_fbwc, reason);
+            break;
+        case FS_ACTION_LONG_CONTINUE:
+        default:
+            ;
         }
         break;
     case Mode::Number::RTL:
