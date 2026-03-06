@@ -97,6 +97,15 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("OFF_NOFS", 8, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
+    // @Param: OFF_DELAY
+    // @DisplayName: RF (TX & VTX) power off delay, ms
+    // @Description: RF (TX & VTX) power off delay, miliseconds (300-800 is recommended to report scheduled shutdown time to GCS).
+    // Typically, it should be lower than OFF_TIMEx * 1000.
+    // @Range 0 65535
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("OFF_DELAY", 9, RF_PowerSwitch, off_delay, RF_POWER_OFF_DELAY),
+
     AP_GROUPEND
 };
 
@@ -161,9 +170,11 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
     // Ensure the RF power was available for at least several seconds if rf_on_time >= 1
     // Power off time in minutes, 0 - disable (always on)
-    off_time = spos != RC_Channel::AuxSwitchPos::HIGH
-        ? off_time1 * 60 : get_random_uniform(off_time2 * 60, dev_time2 * 60);
+    if(spos == RC_Channel::AuxSwitchPos::HIGH) {
+        srand(now_ms);  // Introduce random seed for the power switch
+        off_time = get_random_uniform(off_time2 * 60, dev_time2 * 60);
         // get_random_normal(off_time2 * 60, dev_time2 * 60 / 3);  // Note: STD ~<= bound / 3 
+    } else off_time = off_time1 * 60;
 
     if(last_spos == spos && now_ms - last_tms < (off_time + on_time) * 1000) {
         *text = 0;
@@ -198,7 +209,7 @@ void RF_PowerSwitch::periodic()
     switch(power) {
     case Power::DEACTIVATING:
         // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
-        if(now_ms < switch_time + POWEROFF_DELAY)  // Note: 50ms  is not sufficient for GSC reporting
+        if(now_ms < switch_time + off_delay)  // Note: 50ms  is not sufficient for GSC reporting
             break;
         power = Power::OFF;
         switch_time = now_ms;

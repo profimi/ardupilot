@@ -74,6 +74,9 @@ private:
     AP_Int8 safe_pitch;  // deg
     AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
     AP_Int8 off_nofs;  // Disable failsafe triggering on powering off RF communication
+    // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
+    // 200, 300 ms is also not always sufficient
+    AP_Int16 off_delay;  // ms; poweroff delay (latency) to ensure the notification is passed to the GS
 
     int16_t alt;  // Current altitude
     int8_t vspeed;  // Current vspeed
@@ -84,10 +87,6 @@ private:
     char text[0xFF];
     AP_Enum<Failsafe>* failsafe;  // Vehicle hardware RF failsafe enabling flag
     const bool* is_crashed;  // Whether the vehicle is crashed
-
-    // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
-    // 200 ms is also not always sufficient
-    static constexpr uint16_t  POWEROFF_DELAY = 300;  // ms; poweroff delay (latency) to ensure the notification is passed to the GS, including the power off duration
 };
 
 #endif  // AP_RELAY_ENABLED

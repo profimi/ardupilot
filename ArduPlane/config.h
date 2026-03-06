@@ -269,3 +269,7 @@
 #ifndef RF_POWER_OFF_NOFS
     #define RF_POWER_OFF_NOFS 0  // false
 #endif
+
+#ifndef RF_POWER_OFF_DELAY
+    #define RF_POWER_OFF_DELAY 500  // 300 ms is also not always sufficient
+#endif
