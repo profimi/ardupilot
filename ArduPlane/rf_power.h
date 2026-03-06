@@ -72,7 +72,6 @@ private:
     AP_Int16 safe_alt;  // m relative to the home point or absolute (relying on the barometer)
     AP_Int8 safe_vspeed;  // m/s
     AP_Int8 safe_pitch;  // deg
-    // AP_Int16 rc_func;  // Mocking RC function (either an unused one or arming; Ardupilot includes hundreds of them)
     AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
     AP_Int8 off_nofs;  // Disable failsafe triggering on powering off RF communication
 

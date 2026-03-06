@@ -440,7 +440,7 @@ bool AP_VideoTX::syncActiveLevs(uint8_t num)
     } else GCS_SEND_TEXT(MAV_SEVERITY_INFO, "No RC channel assigned to VTX Power");
     if (res)
         _num_active_levels.set_and_save(num);
-    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "VTX power levels count (%u) != npos switch levels (2..8)", num);
+    else GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "VTX power (%u) != npos switch (2..8) levels number", num);
     return res;
 }
 

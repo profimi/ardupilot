@@ -81,21 +81,13 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("SAFE_PITCH", 6, RF_PowerSwitch, safe_pitch, RF_POWER_SAFE_PITCH),
 
-    // // @Param: RC_FUNC
-    // // @DisplayName: Mocking RC function
-    // // @Description: Mocking RC function (either an unused one or arming; Ardupilot includes hundreds of them)
-    // // @Range -32767 32767
-    // // @Increment: 1
-    // // @User: Standard
-    // AP_GROUPINFO("RC_FUNC", 7, RF_PowerSwitch, rc_func, RC_Channel::AUX_FUNC::ARMDISARM),
-
     // @Param: CTL_GPIO
     // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
     // @Description: GPIO that de/activates the RF (TX & VTX) power switch for the integration with fiber optic controlled RF powering; -1 = 255 - disabled
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("CTL_GPIO", 8, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+    AP_GROUPINFO("CTL_GPIO", 7, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
 
     // @Param: OFF_NOFS
     // @DisplayName: Disable failsafe triggering on powering off RF communication
@@ -103,7 +95,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 1
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("OFF_NOFS", 9, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
+    AP_GROUPINFO("OFF_NOFS", 8, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
     AP_GROUPEND
 };
@@ -200,7 +192,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
 void RF_PowerSwitch::periodic()
 {
-    static Failsafe failsafe_orig;
+    static Failsafe fsval_orig;
     // Check crash status
     const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
     switch(power) {
@@ -214,7 +206,7 @@ void RF_PowerSwitch::periodic()
         // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);  // However, that call is slow
         // Disable the failsafe state if necessary
         if(off_nofs && failsafe) {
-            failsafe_orig = *failsafe;
+            fsval_orig = *failsafe;
             failsafe->set(Failsafe::EnabledNoFS);  // That is throttle_fs_enabled
 
             // // FS_GCS_ENABLE = 0   // Disable GCS failsafe entirely
@@ -266,7 +258,7 @@ void RF_PowerSwitch::periodic()
         switch_time = now_ms;
         // Recover the failsafe mode if it was diabled on power deactivation
         if(off_nofs && failsafe)
-            failsafe->set(failsafe_orig);
+            failsafe->set(fsval_orig);
         break;
     default:
         if(is_critical()) {
