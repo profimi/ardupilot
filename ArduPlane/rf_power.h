@@ -70,8 +70,9 @@ private:
     AP_Int8 dev_time2;  // min, < off_time2
     AP_Int8 on_time;  // sec (0: disable, 1: infinity, 2..255 sec)
     AP_Int16 safe_alt;  // m relative to the home point or absolute (relying on the barometer)
-    AP_Int8 safe_vspeed;  // m/s
-    AP_Int8 safe_pitch;  // deg
+    AP_Int8 safe_vspeed;  // m/s: 0 .. 127 .. 255
+    AP_Int8 safe_pitch;  // deg: 0 .. 180
+    AP_Int8 safe_yaw;  // deg: 0 .. 180
     AP_Int8 ctl_gpio;  // Control GPIO that de/activates the power switch
     AP_Int8 off_nofs;  // Disable failsafe triggering on powering off RF communication
     // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
@@ -81,8 +82,9 @@ private:
     int16_t alt;  // Current altitude
     int8_t vspeed;  // Current vspeed
     int8_t pitch;  // Current pitch angle, deg, negative ground inclination (down is negative)
+    int16_t dyaw;  // Yaw offset relative to the yaw value on RF powering off: -180, 180
     uint16_t off_time;  // Scheduling power off time, sec
-    uint32_t switch_time;  // Power switching time, ms
+    uint32_t switch_time;  // Power switching timestamp, ms
     Power power;  // Whether in the power state, when safety checks should be activated
     char text[0xFF];
     AP_Enum<Failsafe>* failsafe;  // Vehicle hardware RF failsafe enabling flag

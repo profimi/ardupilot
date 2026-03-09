@@ -41,7 +41,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Param: DEV_TIME2
     // @DisplayName: RF (TX & VTX) power off deviation (~3 STD) for mode 2
     // @Description: RF (TX & VTX) power off deviation (range bound) for mode 2, minutes < off_time2; 0 - disabled (exact time)
-    // @Range 0 off_time2
+    // @Range 0 OFF_TIME2
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("DEV_TIME2", 2, RF_PowerSwitch, dev_time2, RF_POWER_DEV_TIME2),
@@ -60,14 +60,14 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Param: SAFE_ALT
     // @DisplayName: Safe altitude for RF (TX & VTX) powering off
     // @Description: Minimal safe altitude relative to the home point for RF (TX & VTX) powering off, m
-    // @Range -32767 32767
+    // @Range -32768 32767
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("SAFE_ALT", 4, RF_PowerSwitch, safe_alt, RF_POWER_SAFE_ALT),
 
     // @Param: SAFE_VSPEED
     // @DisplayName: Safe vertical speed for RF (TX & VTX) powering off
-    // @Description: Maximal safe vertical speed for RF (TX & VTX) powering off, m/s
+    // @Description: Maximal safe vertical speed for RF (TX & VTX) powering off, m/s; 0 - disabled
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
@@ -75,11 +75,19 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
 
     // @Param: SAFE_PITCH
     // @DisplayName: Safe pitch angle for RF (TX & VTX) powering off
-    // @Description: Maximal absolute pitch angle for RF (TX & VTX) powering off, deg
+    // @Description: Maximal absolute pitch angle for RF (TX & VTX) powering off, deg; 0 - disabled
     // @Range 0 180
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("SAFE_PITCH", 6, RF_PowerSwitch, safe_pitch, RF_POWER_SAFE_PITCH),
+
+    // @Param: SAFE_YAW
+    // @DisplayName: Safe yaw angle change relative to the one on RF (TX & VTX) powering off
+    // @Description: Maximal absolute yaw angle nodule relative to the one on RF (TX & VTX) powering off, deg; 0 - disabled
+    // @Range 0 180
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("SAFE_YAW", 7, RF_PowerSwitch, safe_yaw, RF_POWER_SAFE_YAW),
 
     // @Param: CTL_GPIO
     // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
@@ -87,7 +95,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("CTL_GPIO", 7, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+    AP_GROUPINFO("CTL_GPIO", 8, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
 
     // @Param: OFF_NOFS
     // @DisplayName: Disable failsafe triggering on powering off RF communication
@@ -95,7 +103,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 1
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("OFF_NOFS", 8, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
+    AP_GROUPINFO("OFF_NOFS", 9, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
     // @Param: OFF_DELAY
     // @DisplayName: RF (TX & VTX) power off delay, ms
@@ -104,19 +112,20 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 65535
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("OFF_DELAY", 9, RF_PowerSwitch, off_delay, RF_POWER_OFF_DELAY),
+    AP_GROUPINFO("OFF_DELAY", 10, RF_PowerSwitch, off_delay, RF_POWER_OFF_DELAY),
 
     AP_GROUPEND
 };
 
 RF_PowerSwitch::RF_PowerSwitch()
-: alt{0}, vspeed{0}, pitch{0}, off_time{0}, switch_time{0}, power{Power::ON}
+: alt{0}, vspeed{0}, pitch{0}, dyaw{0}, off_time{0}, switch_time{0}, power{Power::ON}
 , text{0}, failsafe(nullptr), is_crashed(nullptr)
 {}
 
 bool RF_PowerSwitch::is_safe() const
 {
-    return alt >= safe_alt && abs(vspeed) <= uint8_t(safe_vspeed) && abs(pitch) <= uint8_t(safe_pitch) && !is_critical();
+    return alt >= safe_alt && (safe_vspeed == 0 || abs(vspeed) <= (uint8_t)safe_vspeed) && (safe_pitch == 0 || abs(pitch) <= (uint8_t)safe_pitch)
+        && (safe_yaw == 0 || abs(dyaw) < (uint8_t)safe_yaw) && !is_critical();
 }
 
 bool RF_PowerSwitch::is_critical() const
@@ -172,9 +181,9 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Power off time in minutes, 0 - disable (always on)
     if(spos == RC_Channel::AuxSwitchPos::HIGH) {
         srand(now_ms);  // Introduce random seed for the power switch
-        off_time = get_random_uniform(off_time2 * 60, dev_time2 * 60);
+        off_time = get_random_uniform((uint8_t)off_time2 * 60, (uint8_t)dev_time2 * 60);
         // get_random_normal(off_time2 * 60, dev_time2 * 60 / 3);  // Note: STD ~<= bound / 3 
-    } else off_time = off_time1 * 60;
+    } else off_time = (uint8_t)off_time1 * 60;
 
     if(last_spos == spos && now_ms - last_tms < (off_time + on_time) * 1000) {
         *text = 0;
@@ -204,22 +213,32 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 void RF_PowerSwitch::periodic()
 {
     static Failsafe fsval_orig;
+    static int16_t yaw_off;  // Yaw value on RF powering off
+
     // Check crash status
     const uint32_t now_ms = AP_HAL::millis();  // Time since boot in milliseconds
     switch(power) {
     case Power::DEACTIVATING:
-        // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
-        if(now_ms < switch_time + off_delay)  // Note: 50ms  is not sufficient for GSC reporting
-            break;
-        power = Power::OFF;
-        switch_time = now_ms;
-        AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, false);
+        {
+            const AP_AHRS& ahrs = AP::ahrs();
+            if(!ahrs.healthy()) {
+                strncpy(text, "No RFPW off: unsafe deactivation (unhealthy AHRS)", sizeof(text)-1);
+                break;
+            }
+            // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
+            if(now_ms < switch_time + (uint8_t)off_delay)  // Note: 50ms  is not sufficient for GSC reporting
+                break;
+            power = Power::OFF;
+            switch_time = now_ms;
+            AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, false);
+            yaw_off = ahrs.get_yaw_deg();
+        }
+
         // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);  // However, that call is slow
         // Disable the failsafe state if necessary
         if(off_nofs && failsafe) {
             fsval_orig = *failsafe;
             failsafe->set(Failsafe::EnabledNoFS);  // That is throttle_fs_enabled
-
             // // FS_GCS_ENABLE = 0   // Disable GCS failsafe entirely
             // // FS_LONG_TIMEOUT = 0 // Disable long failsafe
             // // plane.g.throttle_failsafe.set_and_save(0);
@@ -236,33 +255,36 @@ void RF_PowerSwitch::periodic()
         }
         // Seamlessly switching to the power off
         FALLTHROUGH;
-    case Power::OFF:
-        // Update the flight safety values (altitude and pitching)
-        {
-            const AP_AHRS& ahrs = AP::ahrs();
+    case Power::OFF: {
+        const AP_AHRS& ahrs = AP::ahrs();
+        if(ahrs.healthy()) {
+            // Update the flight safety values (altitude and pitching)
+            {
+                float alt_home = 0;
+                ahrs.get_relative_position_D_home(alt_home);  // get_velocity_D; getCorrectedDeltaVelocityNED; get_velocity_NED
+                // AP::ahrs().get_location(loc)
+                // alt_home = loc.alt * 0.01f;  // Convert cm to meters
+                alt = -roundf(alt_home);  // constrain_float(alt_home, INT16_MIN, INT16_MAX)
+                
+                float vel = 0;
+                if(!ahrs.get_velocity_D(vel)) {
+                    // This is an estimated value, which might be inaccurate or invalid
+                }
+                vspeed = constrain_int16(-roundf(vel), INT8_MIN, INT8_MAX);
 
-            float alt_home = 0;
-            ahrs.get_relative_position_D_home(alt_home);  // get_velocity_D; getCorrectedDeltaVelocityNED; get_velocity_NED
-            // AP::ahrs().get_location(loc)
-            // alt_home = loc.alt * 0.01f;  // Convert cm to meters
-            alt = -roundf(alt_home);  // constrain_float(alt_home, INT16_MIN, INT16_MAX)
-            
-            float vel = 0;
-            if(!ahrs.get_velocity_D(vel)) {
-                // This is an estimated value, which might be inaccurate of invalid
+                pitch = constrain_int16(ahrs.get_pitch_deg(), INT8_MIN, INT8_MAX);  // Negative for descend
+                dyaw = abs(ahrs.get_yaw_deg() - yaw_off) - 180;  // -180 .. 180
             }
-            vspeed = -roundf(vel);  // constrain_float(vel, INT8_MIN, INT8_MAX)
 
-            pitch = ahrs.get_pitch_deg();  // Negative for descend
-        }
-
-        if(!is_safe()) {
-            hal.util->snprintf(text, sizeof(text), "Emergency RFPW on: alt: %d, vspeed: %d, pitch: %d, crbat: %u, crash: %u",
-                alt, vspeed, pitch, is_battery_critical(), is_crashed && *is_crashed);
-        } else if(now_ms < switch_time + off_time * 1000)
-            break;
+            if(is_safe()) {
+                if(now_ms < switch_time + off_time * 1000)
+                    break;
+            } else hal.util->snprintf(text, sizeof(text), "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
+                alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
+        } else strncpy(text, "Emergency RFPW on: unhealthy AHRS", sizeof(text)-1);
         // Seamlessly switching to the power activation
         FALLTHROUGH;
+    }
     case Power::ACTIVATING:
         AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
         power = Power::ON;

@@ -262,6 +262,10 @@
     #define RF_POWER_SAFE_PITCH 20
 #endif
 
+#ifndef RF_POWER_SAFE_YAW
+    #define RF_POWER_SAFE_YAW 20
+#endif
+
 #ifndef RF_POWER_CTL_GPIO
     #define RF_POWER_CTL_GPIO 59  // Servo10 pin
 #endif
