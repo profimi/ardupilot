@@ -1,5 +1,6 @@
 #include "rf_power.h"
 #include <string.h>
+#define RAND_SEEDED  // Essential for AP_Math/AP_Math.h
 #include <AP_Math/AP_Math.h>
 #include <AP_HAL/Util.h>
 #include <AP_Relay/AP_Relay.h>
@@ -100,8 +101,7 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Param: OFF_NOFS
     // @DisplayName: Disable failsafe triggering on powering off RF communication
     // @Description: Disable failsafe triggering when RF communication is powered off to retain current flight mode
-    // @Range 0 1
-    // @Increment: 1
+    // @Values: 0:Disable, 1:Enable
     // @User: Standard
     AP_GROUPINFO("OFF_NOFS", 9, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
@@ -153,7 +153,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // }
     // Returns 1 for HIGH (3.3V/5V), 0 for LOW (0V)
     if(ctl_gpio != -1 && hal.gpio->read(ctl_gpio)) {
-        strncpy(text, "No RFPW switching: HIGH ctl_gpio", sizeof(text));
+        strncpy(text, "No RFPW switching: HIGH ctl_gpio", sizeof(text)-1);
         return false;
     }
 
@@ -162,7 +162,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Intentionally retain power on for rf_on_time == 1 if the RF tumbler has not been switched to another position
     if(last_spos == spos && is_on_infinite()) {  // permanent, continuous, standing
         last_tms = now_ms;
-        strncpy(text, "No RFPW switching: infinite on_time=1", sizeof(text));
+        strncpy(text, "No RFPW switching: infinite on_time=1", sizeof(text)-1);
         return false;
         // *text = 0;
         // return true;
@@ -181,9 +181,9 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Power off time in minutes, 0 - disable (always on)
     if(spos == RC_Channel::AuxSwitchPos::HIGH) {
         srand(now_ms);  // Introduce random seed for the power switch
-        off_time = get_random_uniform((uint8_t)off_time2 * 60, (uint8_t)dev_time2 * 60);
+        off_time = get_random_uniform(uint8_t(off_time2) * 60, uint8_t(dev_time2) * 60);
         // get_random_normal(off_time2 * 60, dev_time2 * 60 / 3);  // Note: STD ~<= bound / 3 
-    } else off_time = (uint8_t)off_time1 * 60;
+    } else off_time = uint8_t(off_time1) * 60;
 
     if(last_spos == spos && now_ms - last_tms < (off_time + on_time) * 1000) {
         *text = 0;
@@ -201,7 +201,7 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     last_tms = now_ms;
 
     if(!off_time) {
-        strncpy(text, "No RFPW off: 0 min is omitted", sizeof(text));
+        strncpy(text, "No RFPW off: 0 min is omitted", sizeof(text)-1);
         return false;  // There is no much sense to notify about omission of power of for 0 min
     }
     hal.util->snprintf(text, sizeof(text), "RFPW is off for %u min %u sec", off_time / 60, off_time % 60);
@@ -221,12 +221,14 @@ void RF_PowerSwitch::periodic()
     case Power::DEACTIVATING:
         {
             const AP_AHRS& ahrs = AP::ahrs();
-            if(!ahrs.healthy()) {
-                strncpy(text, "No RFPW off: unsafe deactivation (unhealthy AHRS)", sizeof(text)-1);
-                break;
-            }
+            // ATTENTION: Intentionally allow control with unhealthy AHRS
+            // if(!ahrs.healthy()) {
+            //     // strncpy(text, "No RFPW off: unsafe deactivation (unhealthy AHRS)", sizeof(text)-1);
+            //     GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "%s", "No RFPW off: unsafe deactivation (unhealthy AHRS)");
+            //     break;
+            // }
             // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
-            if(now_ms < switch_time + (uint8_t)off_delay)  // Note: 50ms  is not sufficient for GSC reporting
+            if(now_ms < switch_time + uint8_t(off_delay))  // Note: 50ms  is not sufficient for GSC reporting
                 break;
             power = Power::OFF;
             switch_time = now_ms;
@@ -257,7 +259,8 @@ void RF_PowerSwitch::periodic()
         FALLTHROUGH;
     case Power::OFF: {
         const AP_AHRS& ahrs = AP::ahrs();
-        if(ahrs.healthy()) {
+        // ATTENTION: Intentionally allow control with unhealthy AHRS
+        // if(ahrs.healthy()) {
             // Update the flight safety values (altitude and pitching)
             {
                 float alt_home = 0;
@@ -279,9 +282,16 @@ void RF_PowerSwitch::periodic()
             if(is_safe()) {
                 if(now_ms < switch_time + off_time * 1000)
                     break;
-            } else hal.util->snprintf(text, sizeof(text), "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
-                alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
-        } else strncpy(text, "Emergency RFPW on: unhealthy AHRS", sizeof(text)-1);
+            } else {
+                // hal.util->snprintf(text, sizeof(text), "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
+                //     alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
+                GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
+                    alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
+            }
+        // } else {
+        //     // strncpy(text, "Emergency RFPW on: unhealthy AHRS", sizeof(text)-1);
+        //     GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "%s", "Emergency RFPW on: unhealthy AHRS");
+        // }
         // Seamlessly switching to the power activation
         FALLTHROUGH;
     }
