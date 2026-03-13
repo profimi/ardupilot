@@ -239,6 +239,16 @@ bool Plane::set_mode(Mode &new_mode, const ModeReason reason)
         }
         return true;
     }
+ 
+    // Replace non-manual and non-takeoff modes to be manual mode before arming if necessary
+    if(g2.prearm_fmode_ctl && !arming.is_armed() && new_mode.mode_number() != Mode::Number::INITIALISING
+    && new_mode.mode_number() != Mode::Number::MANUAL &&  new_mode.mode_number() != Mode::Number::TAKEOFF) {
+        // Replace mode to manual if necessary
+        if(control_mode->mode_number() != Mode::Number::MANUAL)
+            set_mode(Mode::Number::MANUAL, ModeReason::INITIALISED);
+        else AP_Notify::events.user_mode_change = 1;  // make happy noise
+        return true;
+    }
 
 #if HAL_QUADPLANE_ENABLED
     if (new_mode.is_vtol_mode() && !plane.quadplane.available()) {

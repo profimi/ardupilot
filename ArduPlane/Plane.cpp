@@ -132,7 +132,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(avoidance_adsb_update,  10,    100, 144),
 #endif  // HAL_ADSB_ENABLED || AP_ADSB_AVOIDANCE_ENABLED
     SCHED_TASK_CLASS(RC_Channels,       (RC_Channels*)&plane.g2.rc_channels, read_aux_all,           10,    200, 147),
-#if AP_RELAY_ENABLED
+#if RF_POWERSWITCH_ENABLED
     SCHED_TASK_CLASS(RF_PowerSwitch, &plane.g2.rf_pws, periodic,   5,  100,  148),  // Expected time: 200-400
 #endif
 #if HAL_BUTTON_ENABLED

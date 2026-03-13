@@ -234,6 +234,10 @@
     #define THROTTLE_ALT_MIN 10.0f
 #endif
 
+#ifndef PREARM_FMODE_CTL
+    #define PREARM_FMODE_CTL 1
+#endif
+
 #ifndef RF_POWER_OFF_TIME1
     #define RF_POWER_OFF_TIME1 2
 #endif

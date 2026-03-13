@@ -1298,11 +1298,18 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("THROTTLE_ALT_MIN", 47, ParametersG2, throttle_alt_min, THROTTLE_ALT_MIN),
 
-#if AP_RELAY_ENABLED
+#if RF_POWERSWITCH_ENABLED
     // @Group: RFPW_
     // @Path: rf_power.cpp
     AP_SUBGROUPINFO(rf_pws, "RFPW_", 48, ParametersG2, RF_PowerSwitch),
 #endif
+
+    // @Param: PREARM_FMODE_CTL
+    // @DisplayName: Restrict pre-arm flight modes to MAUAL, TAKEOFF and system ones
+    // @Description: Restrict pre-arm flight modes to MAUAL, TAKEOFF and system ones, automtically enforcing the MANUAL flight mode otherwise
+    // @Values: 0:Disable, 1:Enable
+    // @User: Standard
+    AP_GROUPINFO("PREARM_FMODE_CTL", 49, ParametersG2, prearm_fmode_ctl, PREARM_FMODE_CTL),
 
     AP_GROUPEND
 };
