@@ -1,6 +1,6 @@
 #include "rf_power.h"
+#include "Plane.h"
 #include <string.h>
-#define RAND_SEEDED  // Essential for AP_Math/AP_Math.h
 #include <AP_Math/AP_Math.h>
 #include <AP_HAL/Util.h>
 #include <AP_Relay/AP_Relay.h>
@@ -8,8 +8,6 @@
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_Notify/AP_Notify.h>
 #include <AP_VideoTX/AP_VideoTX.h>
-// #include <ArduPlane/Plane.h>
-#include "Plane.h"
 
 extern const AP_HAL::HAL& hal;  // Required for snprintf()
 // extern Plane plane;  // Required for the optional crash check
@@ -180,7 +178,9 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Ensure the RF power was available for at least several seconds if rf_on_time >= 1
     // Power off time in minutes, 0 - disable (always on)
     if(spos == RC_Channel::AuxSwitchPos::HIGH) {
+#ifdef RAND_SEEDED
         srand(now_ms);  // Introduce random seed for the power switch
+#endif
         off_time = get_random_uniform(uint8_t(off_time2) * 60, uint8_t(dev_time2) * 60);
         // get_random_normal(off_time2 * 60, dev_time2 * 60 / 3);  // Note: STD ~<= bound / 3 
     } else off_time = uint8_t(off_time1) * 60;
@@ -192,8 +192,8 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
 
     // Ensure it is safe to power off RF
     if(!is_safe()) {
-        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
-            , pitch, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
+        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, dyaw: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
+            , pitch, dyaw, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
         return false;
     }
 

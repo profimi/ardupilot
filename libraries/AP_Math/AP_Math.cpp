@@ -349,15 +349,20 @@ template uint8_t constrain_value<uint8_t>(const uint8_t amt, const uint8_t low, 
  */
 uint16_t get_random16(void)
 {
-    static uint32_t seed =
+    static uint32_t m_z = 
 #ifdef RAND_SEEDED
-    rand()
+        rand()
 #else
-    0
+        1234
 #endif
     ;
-    static uint32_t m_z = seed ? (seed >> 16) ^ (seed & 0xFFFFu): 1234;
-    static uint32_t m_w = seed ? seed & 0xFFFFu : 76542;
+    static uint32_t m_w =
+#ifdef RAND_SEEDED
+        ((m_z >> 16) ^ (m_z & 0xFFFFu)) * 723
+#else
+        76542
+#endif
+    ;
     m_z = 36969 * (m_z & 0xFFFFu) + (m_z >> 16);
     m_w = 18000 * (m_w & 0xFFFFu) + (m_w >> 16);
     return ((m_z << 16) + m_w) & 0xFFFF;
