@@ -276,7 +276,7 @@ void RF_PowerSwitch::periodic()
                 vspeed = constrain_int16(-roundf(vel), INT8_MIN, INT8_MAX);
 
                 pitch = constrain_int16(ahrs.get_pitch_deg(), INT8_MIN, INT8_MAX);  // Negative for descend
-                dyaw = abs(ahrs.get_yaw_deg() - yaw_off) - 180;  // -180 .. 180
+                dyaw = wrap_180(ahrs.get_yaw_deg() - yaw_off);  // -180 .. 180
             }
 
             if(is_safe()) {
