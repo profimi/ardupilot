@@ -120,10 +120,10 @@ RF_PowerSwitch::RF_PowerSwitch()
 , text{0}, failsafe(nullptr), is_crashed(nullptr)
 {}
 
-bool RF_PowerSwitch::is_safe() const
+bool RF_PowerSwitch::is_safe(bool partial) const
 {
     return alt >= safe_alt && (safe_vspeed == 0 || abs(vspeed) <= (uint8_t)safe_vspeed) && (safe_pitch == 0 || abs(pitch) <= (uint8_t)safe_pitch)
-        && (safe_yaw == 0 || abs(dyaw) < (uint8_t)safe_yaw) && !is_critical();
+        && (partial || safe_yaw == 0 || abs(dyaw) < (uint8_t)safe_yaw) && !is_critical();
 }
 
 bool RF_PowerSwitch::is_critical() const
@@ -191,7 +191,8 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     }
 
     // Ensure it is safe to power off RF
-    if(!is_safe()) {
+    update_safety_vals();
+    if(!is_safe(true)) {
         hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, dyaw: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
             , pitch, dyaw, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
         return false;
@@ -210,6 +211,25 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     return true;
 }
 
+void RF_PowerSwitch::update_safety_vals()
+{
+    const AP_AHRS& ahrs = AP::ahrs();
+
+    float alt_home = 0;
+    ahrs.get_relative_position_D_home(alt_home);  // get_velocity_D; getCorrectedDeltaVelocityNED; get_velocity_NED
+    // AP::ahrs().get_location(loc)
+    // alt_home = loc.alt * 0.01f;  // Convert cm to meters
+    alt = -roundf(alt_home);  // constrain_float(alt_home, INT16_MIN, INT16_MAX)
+    
+    float vel = 0;
+    if(!ahrs.get_velocity_D(vel)) {
+        // This is an estimated value, which might be inaccurate or invalid
+    }
+    vspeed = constrain_int16(-roundf(vel), INT8_MIN, INT8_MAX);
+
+    pitch = constrain_int16(ahrs.get_pitch_deg(), INT8_MIN, INT8_MAX);  // Negative for descend
+}
+
 void RF_PowerSwitch::periodic()
 {
     static Failsafe fsval_orig;
@@ -220,7 +240,7 @@ void RF_PowerSwitch::periodic()
     switch(power) {
     case Power::DEACTIVATING:
         {
-            const AP_AHRS& ahrs = AP::ahrs();
+            // const AP_AHRS& ahrs = AP::ahrs();
             // ATTENTION: Intentionally allow control with unhealthy AHRS
             // if(!ahrs.healthy()) {
             //     // strncpy(text, "No RFPW off: unsafe deactivation (unhealthy AHRS)", sizeof(text)-1);
@@ -233,7 +253,7 @@ void RF_PowerSwitch::periodic()
             power = Power::OFF;
             switch_time = now_ms;
             AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, false);
-            yaw_off = ahrs.get_yaw_deg();
+            yaw_off = AP::ahrs().get_yaw_deg();
         }
 
         // The state can be checked externally by AP::relay()->enabled(AP_Relay_Params::FUNCTION::RF_POWER);  // However, that call is slow
@@ -258,28 +278,16 @@ void RF_PowerSwitch::periodic()
         // Seamlessly switching to the power off
         FALLTHROUGH;
     case Power::OFF: {
-        const AP_AHRS& ahrs = AP::ahrs();
+        // const AP_AHRS& ahrs = AP::ahrs();
         // ATTENTION: Intentionally allow control with unhealthy AHRS
         // if(ahrs.healthy()) {
             // Update the flight safety values (altitude and pitching)
             {
-                float alt_home = 0;
-                ahrs.get_relative_position_D_home(alt_home);  // get_velocity_D; getCorrectedDeltaVelocityNED; get_velocity_NED
-                // AP::ahrs().get_location(loc)
-                // alt_home = loc.alt * 0.01f;  // Convert cm to meters
-                alt = -roundf(alt_home);  // constrain_float(alt_home, INT16_MIN, INT16_MAX)
-                
-                float vel = 0;
-                if(!ahrs.get_velocity_D(vel)) {
-                    // This is an estimated value, which might be inaccurate or invalid
-                }
-                vspeed = constrain_int16(-roundf(vel), INT8_MIN, INT8_MAX);
-
-                pitch = constrain_int16(ahrs.get_pitch_deg(), INT8_MIN, INT8_MAX);  // Negative for descend
-                dyaw = wrap_180(ahrs.get_yaw_deg() - yaw_off);  // -180 .. 180
+                update_safety_vals();
+                dyaw = wrap_180(AP::ahrs().get_yaw_deg() - yaw_off);  // -180 .. 180
             }
 
-            if(is_safe()) {
+            if(is_safe(false)) {
                 if(now_ms < switch_time + off_time * 1000)
                     break;
             } else {
