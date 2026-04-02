@@ -266,6 +266,10 @@
     #define RF_POWER_SAFE_PITCH 20
 #endif
 
+#ifndef RF_POWER_SAFE_ROLL
+    #define RF_POWER_SAFE_ROLL 20
+#endif
+
 #ifndef RF_POWER_SAFE_YAW
     #define RF_POWER_SAFE_YAW 20
 #endif
@@ -279,5 +283,9 @@
 #endif
 
 #ifndef RF_POWER_OFF_DELAY
-    #define RF_POWER_OFF_DELAY 500  // 300 ms is also not always sufficient
+    #define RF_POWER_OFF_DELAY 50  // 30*10 ms is also not always sufficient
+#endif
+
+#ifndef RF_POWER_OFF_TIMEDIV
+    #define RF_POWER_OFF_TIMEDIV 1  // 1 - min, 6 - dozen sec, 60 - sec
 #endif

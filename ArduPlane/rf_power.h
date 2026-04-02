@@ -33,7 +33,7 @@ public:
     // CLASS_NO_COPY(RF_PowerSwitch);
 
     /// @brief Infinite on
-    /// @return Infinite on is enabled until the state change
+    /// @return Infinitely powered on until the explicit power switch state change
     bool is_on_infinite() const  { return on_time == 1; }
 
     /// @brief Whether the powering off is safe
@@ -78,16 +78,18 @@ private:
     AP_Int16 safe_alt;   // m relative to the home point or absolute (relying on the barometer)
     AP_Int8 safe_vspeed; // m/s: 0 .. 127 .. 255
     AP_Int8 safe_pitch;  // deg: 0 .. 180
+    AP_Int8 safe_roll;   // deg: 0 .. 180
     AP_Int8 safe_yaw;    // deg: 0 .. 180
     AP_Int8 ctl_gpio;    // Control GPIO that de/activates the power switch
     AP_Int8 off_nofs;    // Disable failsafe triggering on powering off RF communication
-    // Note: 50 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
-    // 200, 300 ms is also not always sufficient
-    AP_Int16 off_delay; // ms; poweroff delay (latency) to ensure the notification is passed to the GS
+    // Note: 30 ms is insufficent at all (<20% success rate) if the telemetry transfer has not been forced from this endpoint
+    AP_Int8 off_delay;   // dozen ms; poweroff delay (latency) to ensure the notification is passed to the GS
+    AP_Int8 off_tdiv;    // Typical values: 1 - min, 6 - dozen sec, 60 - sec
 
     int16_t alt;          // Current altitude
     int8_t vspeed;        // Current vspeed
     int8_t pitch;         // Current pitch angle, deg, negative ground inclination (down is negative)
+    int8_t roll;          // Current roll angle, deg
     int16_t dyaw;         // Yaw offset relative to the yaw value on RF powering off: -180, 180
     uint16_t off_time;    // Scheduling power off time, sec
     uint32_t switch_time; // Power switching timestamp, ms

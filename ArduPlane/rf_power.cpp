@@ -80,13 +80,21 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("SAFE_PITCH", 6, RF_PowerSwitch, safe_pitch, RF_POWER_SAFE_PITCH),
 
+    // @Param: SAFE_ROLL
+    // @DisplayName: Safe roll angle for RF (TX & VTX) powering off
+    // @Description: Maximal absolute roll angle for RF (TX & VTX) powering off, deg; 0 - disabled
+    // @Range 0 180
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("SAFE_ROLL", 7, RF_PowerSwitch, safe_roll, RF_POWER_SAFE_ROLL),
+
     // @Param: SAFE_YAW
     // @DisplayName: Safe yaw angle change relative to the one on RF (TX & VTX) powering off
     // @Description: Maximal absolute yaw angle nodule relative to the one on RF (TX & VTX) powering off, deg; 0 - disabled
     // @Range 0 180
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("SAFE_YAW", 7, RF_PowerSwitch, safe_yaw, RF_POWER_SAFE_YAW),
+    AP_GROUPINFO("SAFE_YAW", 8, RF_PowerSwitch, safe_yaw, RF_POWER_SAFE_YAW),
 
     // @Param: CTL_GPIO
     // @DisplayName: GPIO that de/activates the RF (TX & VTX) power switch
@@ -94,36 +102,44 @@ const AP_Param::GroupInfo RF_PowerSwitch::var_info[] = {
     // @Range 0 255
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("CTL_GPIO", 8, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
+    AP_GROUPINFO("CTL_GPIO", 9, RF_PowerSwitch, ctl_gpio, RF_POWER_CTL_GPIO),
 
     // @Param: OFF_NOFS
     // @DisplayName: Disable failsafe triggering on powering off RF communication
     // @Description: Disable failsafe triggering when RF communication is powered off to retain current flight mode
     // @Values: 0:Disable, 1:Enable
     // @User: Standard
-    AP_GROUPINFO("OFF_NOFS", 9, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
+    AP_GROUPINFO("OFF_NOFS", 10, RF_PowerSwitch, off_nofs, RF_POWER_OFF_NOFS),
 
     // @Param: OFF_DELAY
-    // @DisplayName: RF (TX & VTX) power off delay, ms
-    // @Description: RF (TX & VTX) power off delay, miliseconds (300-800 is recommended to report scheduled shutdown time to GCS).
+    // @DisplayName: RF (TX & VTX) power off delay, dms
+    // @Description: RF (TX & VTX) power off delay, dozen miliseconds (30-80 is recommended to report scheduled shutdown time to GCS).
     // Typically, it should be lower than OFF_TIMEx * 1000.
-    // @Range 0 65535
+    // @Range 0 255
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("OFF_DELAY", 10, RF_PowerSwitch, off_delay, RF_POWER_OFF_DELAY),
+    AP_GROUPINFO("OFF_DELAY", 11, RF_PowerSwitch, off_delay, RF_POWER_OFF_DELAY),
+
+    // @Param: OFF_TDIV
+    // @DisplayName: RF (TX & VTX) power off modes duration divider (ratio)
+    // @Description: RF (TX & VTX) power off modes duration divider (ratio) for the faster testing: 1 - min, 6 - dozen sec, 60 - sec
+    // @Range 1 255
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("OFF_TDIV", 12, RF_PowerSwitch, off_tdiv, RF_POWER_OFF_TIMEDIV),
 
     AP_GROUPEND
 };
 
 RF_PowerSwitch::RF_PowerSwitch()
-: alt{0}, vspeed{0}, pitch{0}, dyaw{0}, off_time{0}, switch_time{0}, power{Power::ON}
+: alt{0}, vspeed{0}, pitch{0}, roll{0}, dyaw{0}, off_time{0}, switch_time{0}, power{Power::ON}
 , text{0}, failsafe(nullptr), is_crashed(nullptr)
 {}
 
 bool RF_PowerSwitch::is_safe(bool partial) const
 {
     return alt >= safe_alt && (safe_vspeed == 0 || abs(vspeed) <= (uint8_t)safe_vspeed) && (safe_pitch == 0 || abs(pitch) <= (uint8_t)safe_pitch)
-        && (partial || safe_yaw == 0 || abs(dyaw) < (uint8_t)safe_yaw) && !is_critical();
+         && (safe_roll == 0 || abs(roll) <= (uint8_t)safe_roll) && (partial || safe_yaw == 0 || abs(dyaw) < (uint8_t)safe_yaw) && !is_critical();
 }
 
 bool RF_PowerSwitch::is_critical() const
@@ -137,6 +153,11 @@ void RF_PowerSwitch::init(AP_Enum<Failsafe>* rf_failsafe, bool* crashed)
     failsafe = rf_failsafe;
     is_crashed = crashed;
     AP::relay()->set(AP_Relay_Params::FUNCTION::RF_POWER, true);
+    // Validate input parameter for errros
+    if(!off_tdiv) {
+        off_tdiv.set_and_save(1);
+        strncpy(text, "Invalid input off_tdiv=0 -> 1 corrected", sizeof(text)-1);
+    }
 }
 
 bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
@@ -185,7 +206,8 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
         // get_random_normal(off_time2 * 60, dev_time2 * 60 / 3);  // Note: STD ~<= bound / 3 
     } else off_time = uint8_t(off_time1) * 60;
 
-    if(last_spos == spos && now_ms - last_tms < (off_time + on_time) * 1000) {
+    // Note: on_time == 1 is considered above by is_on_infinite()
+    if(last_spos == spos && now_ms - last_tms < MAX(off_time / off_tdiv, on_time) * 1000) {
         *text = 0;
         return false;
     }
@@ -193,8 +215,8 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     // Ensure it is safe to power off RF
     update_safety_vals();
     if(!is_safe(true)) {
-        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, dyaw: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
-            , pitch, dyaw, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
+        hal.util->snprintf(text, sizeof(text), "No RFPW off: unsafe (pitch: %d, roll: %d, dyaw: %d, alt: %d, vs: %d, crbat: %u, crash: %u)"
+            , pitch, roll, dyaw, alt, vspeed, is_battery_critical(), is_crashed && *is_crashed);
         return false;
     }
 
@@ -202,10 +224,10 @@ bool RF_PowerSwitch::process(RC_Channel::AuxSwitchPos spos)
     last_tms = now_ms;
 
     if(!off_time) {
-        strncpy(text, "No RFPW off: 0 min is omitted", sizeof(text)-1);
+        strncpy(text, "No RFPW off: 0 means omitted", sizeof(text)-1);
         return false;  // There is no much sense to notify about omission of power of for 0 min
     }
-    hal.util->snprintf(text, sizeof(text), "RFPW is off for %u min %u sec", off_time / 60, off_time % 60);
+    hal.util->snprintf(text, sizeof(text), "RFPW is off for %u min %u sec", off_time / (off_tdiv*60), (off_time / off_tdiv) % 60);
     power = Power::DEACTIVATING;
     switch_time = now_ms;
     return true;
@@ -228,6 +250,7 @@ void RF_PowerSwitch::update_safety_vals()
     vspeed = constrain_int16(-roundf(vel), INT8_MIN, INT8_MAX);
 
     pitch = constrain_int16(ahrs.get_pitch_deg(), INT8_MIN, INT8_MAX);  // Negative for descend
+    roll = constrain_int16(ahrs.get_roll_deg(), INT8_MIN, INT8_MAX);  // Negative for the left roll (counter clockwise)
 }
 
 void RF_PowerSwitch::periodic()
@@ -248,7 +271,7 @@ void RF_PowerSwitch::periodic()
             //     break;
             // }
             // Introduce a small delay on powering off (50ms) to secure transfer of the powering off notification with the expected timing to the GCS
-            if(now_ms < switch_time + uint8_t(off_delay))  // Note: 50ms  is not sufficient for GSC reporting
+            if(now_ms < switch_time + uint8_t(off_delay)*10)  // Note: 30ms  is not sufficient for GSC reporting
                 break;
             power = Power::OFF;
             switch_time = now_ms;
@@ -262,7 +285,7 @@ void RF_PowerSwitch::periodic()
             fsval_orig = *failsafe;
             failsafe->set(Failsafe::EnabledNoFS);  // That is throttle_fs_enabled
             // // FS_GCS_ENABLE = 0   // Disable GCS failsafe entirely
-            // // FS_LONG_TIMEOUT = 0 // Disable long failsafe
+            // // // Note: FS_LONG_TIMEOUT = 0 // Long failsafe is activated at once
             // // plane.g.throttle_failsafe.set_and_save(0);
             //
             // // Handles physicall loss of RF connectifity
@@ -288,13 +311,13 @@ void RF_PowerSwitch::periodic()
             }
 
             if(is_safe(false)) {
-                if(now_ms < switch_time + off_time * 1000)
+                if(now_ms < switch_time + off_time * 1000 / off_tdiv)
                     break;
             } else {
                 // hal.util->snprintf(text, sizeof(text), "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
                 //     alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
-                GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, dyaw: %d, crbat: %u, crash: %u)",
-                    alt, vspeed, pitch, dyaw, is_battery_critical(), is_crashed && *is_crashed);
+                GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Emergency RFPW on (alt: %d, vspeed: %d, pitch: %d, roll: %d, dyaw: %d, crbat: %u, crash: %u)",
+                    alt, vspeed, pitch, roll, dyaw, is_battery_critical(), is_crashed && *is_crashed);
             }
         // } else {
         //     // strncpy(text, "Emergency RFPW on: unhealthy AHRS", sizeof(text)-1);
