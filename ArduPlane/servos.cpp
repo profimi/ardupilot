@@ -620,6 +620,13 @@ float Plane::apply_throttle_limits(float throttle_in)
  */
 void Plane::set_throttle(void)
 {
+    RC_Channel *chan = rc().find_channel_for_option(RC_Channel::AUX_FUNC::DIRLOCK);
+    if (chan != nullptr && chan->get_aux_switch_pos() == RC_Channel::AuxSwitchPos::HIGH && arming.is_armed_and_safety_off()  // && !failsafe.fixed_yaw
+    // Lock the throttle value by the DIRLOCK switch only in the FBWA flight mode
+    && control_mode == &mode_fbwa) {  // control_mode->mode_number() == Mode::Number::FBWA
+        // Retain current throttle value
+        return;
+    }
 
     // Update voltage scaling
     g2.fwd_batt_cmp.update();
@@ -1061,30 +1068,30 @@ void Plane::servos_output(void)
 
     // Overwrite standard servo control when necessary
     // Note: SRV_Channels::set_output_scaled() should be after SRV_Channels::copy_radio_in_out_mask() and before SRV_Channels::calc_pwm()
-    static uint8_t  msgNum = 0;
-    const bool isMsgOutp = ++msgNum & 0x80;
-    if(isMsgOutp) {
-        debug("Inited k_throttleLeft: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft));
-        debug("Inited k_throttleRight: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight));
-    }
+    // static uint8_t  msgNum = 0;
+    // const bool isMsgOutp = ++msgNum & 0x80;
+    // if(isMsgOutp) {
+    //     debug("Inited k_throttleLeft: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft));
+    //     debug("Inited k_throttleRight: %f", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight));
+    // }
 
     RC_Channel* throttles_kill_switch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::KILL_THROTTLE_LR);
     if (throttles_kill_switch != nullptr) {
-        if(isMsgOutp)
-            debug("KILL_THROTTLE_LR: %u, ch: %u", (uint8_t)throttles_kill_switch->get_aux_switch_pos(), throttles_kill_switch->ch());
+        // if(isMsgOutp)
+        //     debug("KILL_THROTTLE_LR: %u, ch: %u", (uint8_t)throttles_kill_switch->get_aux_switch_pos(), throttles_kill_switch->ch());
 
         switch(throttles_kill_switch->get_aux_switch_pos()) {
         case RC_Channel::AuxSwitchPos::LOW:
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0);
-            if(isMsgOutp)
-                debug("Throttle left is disabled");
+            // if(isMsgOutp)
+            //     debug("Throttle left is disabled");
             break;
         case RC_Channel::AuxSwitchPos::HIGH:
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0);
-            // // Alternative: Use direct output index, but this should be called after the SRV_Channels::output_ch_all();
-            // hal.rcout->write(1, 1000);  // Output 2 (0-indexed) = 1000μs
-            if(isMsgOutp)
-                debug("Throttle right is disabled");
+            // // // Alternative: Use direct output index, but this should be called after the SRV_Channels::output_ch_all();
+            // // hal.rcout->write(1, 1000);  // Output 2 (0-indexed) = 1000μs
+            // if(isMsgOutp)
+            //     debug("Throttle right is disabled");
             break;
         // case MIDDLE:
         default:
@@ -1102,10 +1109,10 @@ void Plane::servos_output(void)
         servos_auto_trim();
     }
 
-    if(isMsgOutp) {
-        debug("Set k_throttleLeft: %f, motor0: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft), hal.rcout->read(0));
-        debug("Set k_throttleRight: %f, motor1: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight), hal.rcout->read(1));
-    }
+    // if(isMsgOutp) {
+    //     debug("Set k_throttleLeft: %f, motor0: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleLeft), hal.rcout->read(0));
+    //     debug("Set k_throttleRight: %f, motor1: %u", SRV_Channels::get_output_scaled(SRV_Channel::k_throttleRight), hal.rcout->read(1));
+    // }
 }
 
 void Plane::update_throttle_hover() {

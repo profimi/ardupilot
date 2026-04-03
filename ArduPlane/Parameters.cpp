@@ -1311,6 +1311,14 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("PREARM_FMODE_CTL", 49, ParametersG2, prearm_fmode_ctl, PREARM_FMODE_CTL),
 
+    // // @Param: DIRLOCK_RCIN
+    // // @DisplayName: RCIN channel to lock attitude (flight directions) in the FBWA flight mode
+    // // @Description: Lock attitude (all flight directions) in the FBWA flight mode; 0 means disable
+    // // @Range 0 32
+    // // @Increment: 1
+    // // @User: Standard
+    // AP_GROUPINFO("DIRLOCK_RCIN", 50, ParametersG2, dirlock_rcin, DIRLOCK_RCIN),
+
     AP_GROUPEND
 };
 

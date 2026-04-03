@@ -289,3 +289,7 @@
 #ifndef RF_POWER_OFF_TIMEDIV
     #define RF_POWER_OFF_TIMEDIV 1  // 1 - min, 6 - dozen sec, 60 - sec
 #endif
+
+// #ifndef DIRLOCK_RCIN
+//     #define DIRLOCK_RCIN 16
+// #endif

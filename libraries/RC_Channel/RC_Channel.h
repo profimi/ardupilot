@@ -417,6 +417,7 @@ public:
 // #if HAL_RF_POWER_ENABLED
         RF_POWER_SWITCH =    241, // RF (TX & VTX) power switch relay control in specific operating modes for various vehicles
 // #endif  // HAL_RF_POWER_ENABLED
+        DIRLOCK =            242, // Lock attitude (flight directions) in the FBWA flight mode
 
         // inputs 248-249 are reserved for the Skybrush fork at
         // https://github.com/skybrush-io/ardupilot

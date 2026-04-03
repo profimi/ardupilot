@@ -909,6 +909,7 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
     { AUX_FUNC::MOTOR_INTERLOCK,"MotorInterlock"},
     { AUX_FUNC::KILL_THROTTLE_LR, "Kill Throttle L/R Switch"},
     { AUX_FUNC::RF_POWER_SWITCH, "RF (TX & VTX) power swich relay control"},
+    { AUX_FUNC::DIRLOCK, "Lock attitude (flight directions) in the FBWA flight mode"},
 #if AP_SERVORELAYEVENTS_ENABLED && AP_RELAY_ENABLED
     { AUX_FUNC::RELAY2,"Relay2"},
     { AUX_FUNC::RELAY3,"Relay3"},
@@ -1758,6 +1759,7 @@ bool RC_Channel::do_aux_function(const AuxFuncTrigger &trigger)
         break;
 
     case AUX_FUNC::KILL_THROTTLE_LR:
+    case AUX_FUNC::DIRLOCK:
         break;
 
     case AUX_FUNC::RF_POWER_SWITCH: {
