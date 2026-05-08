@@ -72,7 +72,8 @@ public:
 #endif
 
         // Custom
-        FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronuously set to this value to support Flight mode switching from RC
+        FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronously set to this value to support Flight mode switching from RC
+        FLY_BY_WIRE_T = 29,  // ATTENTION: FLTMODEn or respective AUX function's RC switch should be synchronously set to this value to support Flight mode switching from RC
         // Mode number 30 reserved for "offboard" for external/lua control.
     };
 
@@ -665,7 +666,7 @@ protected:
     bool _enter() override;
 };
 
-// Like FBWB but with automatic roll control and without taking pitch change from RC and without reacting on the right stick (see also STICK_MIXING)
+// Like FBWA but with failsafe FBWC-like flight in case of FBWT_LIMIT_X violation
 class ModeFBWC : public Mode
 {
 public:
@@ -690,6 +691,33 @@ public:
 protected:
     float target_yaw = 0.0f;  // In rad
     bool _enter() override;
+};
+
+class ModeFBWT : public Mode
+{
+public:
+
+    Number mode_number() const override { return Number::FLY_BY_WIRE_T; }
+    const char *name() const override { return "FBWT"; }
+    const char *name4() const override { return "FBWT"; }
+
+    // methods that affect movement of the vehicle in this mode
+    void update() override;
+    
+    bool mode_allows_autotuning() const override { return true; }
+
+    void run() override;
+
+#if AP_PLANE_SYSTEMID_ENABLED
+    // does this mode support fixed wing systemid?
+    bool supports_fw_systemid() const override { return true; }
+#endif
+
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
+    bool allows_autoland_direction_capture() const override { return true; }
+#endif
+
 };
 
 class ModeCruise : public Mode

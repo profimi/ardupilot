@@ -196,6 +196,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 'STABILIZE',
                 'TRAINING',
                 'FBWC',
+                'FBWT',
         ):
             self.progress("Testing %s mode" % mode)
             self.change_mode(mode)

@@ -308,6 +308,7 @@ private:
     ModeFBWA mode_fbwa;
     ModeFBWB mode_fbwb;
     ModeFBWC mode_fbwc;
+    ModeFBWT mode_fbwt;
     ModeCruise mode_cruise;
     ModeAutoTune mode_autotune;
     ModeAuto mode_auto;

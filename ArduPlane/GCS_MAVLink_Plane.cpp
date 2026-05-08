@@ -1336,6 +1336,7 @@ uint8_t GCS_MAVLINK_Plane::send_available_mode(uint8_t index) const
         &plane.mode_autoland,
 #endif
         &plane.mode_fbwc,
+        &plane.mode_fbwt,
     };
 
     const uint8_t fw_mode_count = ARRAY_SIZE(fw_modes);

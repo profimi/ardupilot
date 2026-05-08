@@ -425,6 +425,7 @@ public:
         // Custom AUX functions
         FBWB =                250, // Fly-By-Wire-B
         FBWC =                251, // Fly-By-Wire-C
+        FBWT =                252, // Fly-By-Wire-T Training mode
 
 #if AP_SCRIPTING_ENABLED
         // inputs for the use of onboard lua scripting

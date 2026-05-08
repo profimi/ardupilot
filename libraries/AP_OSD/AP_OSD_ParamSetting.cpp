@@ -165,7 +165,7 @@ static const char* SERVO_FUNCTIONS[] = {
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
 
 static const char* AUX_OPTIONS[] = {
-    "NONE", "", "", "", "RTL", "", "", "", "", "CAM_TRG",
+    "NONE", "", "", "", "RTL", "FBWC", "", "", "", "CAM_TRG",
     "", "", "", "", "", "", "AUTO", "", "", "",
     "", "", "", "", "MIS_RST", "", "", "", "RLY", "LAND_GR",
     "LOST_SND", "M_ESTOP", "", "", "", "RLY3", "RLY4", "", "OA_ADSB", "",
@@ -179,32 +179,33 @@ static const char* AUX_OPTIONS[] = {
 };
 
 static const char* FLTMODES[] = {
-    "MAN", "CIRC", "STAB", "TRAIN", "ACRO", "FBWA", "FBWB", "FBWC", "CRUISE", "ATUNE", "", "AUTO",
+    "MAN", "CIRC", "STAB", "TRAIN", "ACRO", "FBWA", "FBWB", "FBWC", "FBWT", "CRUISE", "ATUNE", "", "AUTO",
     "RTL", "LOIT", "TKOF", "ADSB", "GUID", "", "QSTAB", "QHOV", "QLOIT", "QLAND",
     "QRTL", "QTUNE", "QACRO", "THRML", "L2QLND"
 };
 
 static const char* FS_ACT[] = {
-    "NONE", "RTL", "LAND", "TERM", "QLAND", "PARA"
+    "NONE", "RTL", "LAND", "TERM", "QLAND", "PARA", "FBWC"
 };
 
 static const char* FS_SHRT_ACTNS[] = {
-    "CRC_NOCHNGE", "CIRC", "FBWA", "DSABLE"
+    "CRC_NOCHNGE", "CIRC", "FBWA", "FBWC", "DSABLE"
 };
 
 static const char* FS_LNG_ACTNS[] = {
-    "CNTNUE", "RTL", "GLIDE", "PARACHT"
+    "CNTNUE", "RTL", "GLIDE", "FBWC", "PARACHT"
 };
 
 // plane parameters
 const AP_OSD_ParamSetting::ParamMetadata AP_OSD_ParamSetting::_param_metadata[unsigned(AP_OSD_ParamSetting::Type::NUM_TYPES)] = {
+    // min, max, increment, values_max
     { -1, AP_SerialManager::SerialProtocol_NumProtocols - 1,    1, ARRAY_SIZE(SERIAL_PROTOCOL_VALUES), SERIAL_PROTOCOL_VALUES },  // OSD_PARAM_SERIAL_PROTOCOL
     { 0, SRV_Channel::k_nr_aux_servo_functions - 1,             1, ARRAY_SIZE(SERVO_FUNCTIONS), SERVO_FUNCTIONS },                // OSD_PARAM_SERVO_FUNCTION
-    { 0, 105, 1, ARRAY_SIZE(AUX_OPTIONS), AUX_OPTIONS },                        // OSD_PARAM_AUX_FUNCTION
-    { 0, 25, 1,  ARRAY_SIZE(FLTMODES), FLTMODES },                              // OSD_PARAM_FLIGHT_MODE
-    { 0, 5, 1,   ARRAY_SIZE(FS_ACT), FS_ACT },                                  // OSD_PARAM_FAILSAFE_ACTION
-    { 0, 3, 1,   ARRAY_SIZE(FS_SHRT_ACTNS), FS_SHRT_ACTNS },                    // OSD_PARAM_FAILSAFE_ACTION_1
-    { 0, 3, 1,   ARRAY_SIZE(FS_LNG_ACTNS), FS_LNG_ACTNS },                      // OSD_PARAM_FAILSAFE_ACTION_2
+    { 0, ARRAY_SIZE(AUX_OPTIONS)-1, 1, ARRAY_SIZE(AUX_OPTIONS), AUX_OPTIONS },                        // OSD_PARAM_AUX_FUNCTION
+    { 0, ARRAY_SIZE(FLTMODES)-1, 1,  ARRAY_SIZE(FLTMODES), FLTMODES },                              // OSD_PARAM_FLIGHT_MODE
+    { 0, ARRAY_SIZE(FS_ACT)-1, 1,   ARRAY_SIZE(FS_ACT), FS_ACT },                                  // OSD_PARAM_FAILSAFE_ACTION
+    { 0, ARRAY_SIZE(FS_SHRT_ACTNS)-1, 1,   ARRAY_SIZE(FS_SHRT_ACTNS), FS_SHRT_ACTNS },                    // OSD_PARAM_FAILSAFE_ACTION_1
+    { 0, ARRAY_SIZE(FS_LNG_ACTNS)-1, 1,   ARRAY_SIZE(FS_LNG_ACTNS), FS_LNG_ACTNS },                      // OSD_PARAM_FAILSAFE_ACTION_2
 };
 
 #elif APM_BUILD_COPTER_OR_HELI

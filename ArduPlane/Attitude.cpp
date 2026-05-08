@@ -304,6 +304,7 @@ void Plane::stabilize_stick_mixing_fbw()
         control_mode == &mode_autotune ||
         control_mode == &mode_fbwb ||
         control_mode == &mode_fbwc ||
+        control_mode == &mode_fbwt ||
         control_mode == &mode_cruise ||
 #if HAL_QUADPLANE_ENABLED
         control_mode == &mode_qstabilize ||

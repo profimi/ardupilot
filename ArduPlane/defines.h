@@ -138,7 +138,7 @@ enum class UseReverseThrust {
     RTL                  = (1<<6),
     CIRCLE               = (1<<7),
     CRUISE               = (1<<8),
-    FBWB                 = (1<<9),  // Used by both FBWB and FBWC
+    FBWB                 = (1<<9),  // Used by both FBWB and FBWC, and can be used by the restricted automatic flight in FBWT
     GUIDED               = (1<<10),
     AUTO_LANDING_PATTERN = (1<<11),
     FBWA                 = (1<<12),
