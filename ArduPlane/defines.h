@@ -141,10 +141,12 @@ enum class UseReverseThrust {
     FBWB                 = (1<<9),  // Used by both FBWB and FBWC, and can be used by the restricted automatic flight in FBWT
     GUIDED               = (1<<10),
     AUTO_LANDING_PATTERN = (1<<11),
-    FBWA                 = (1<<12),
+    FBWA                 = (1<<12),  // Used by both FBWA and FBWT
     ACRO                 = (1<<13),
     STABILIZE            = (1<<14),
     THERMAL              = (1<<15),
+    // FBWB                 = (1<<16),
+    // FBWC                 = (1<<17),
 };
 
 enum FlightOptions {

@@ -1,5 +1,19 @@
 #include "Plane.h"
 
+// Check whether the airplane is flying before turning on some failsafe modes (e.g., FBWC, FBWA with airspeed sensor)
+// to prevent unexpected hight throttle when RC is lost (e.g., discharged or turned off) on the ground in the armed state,
+// avoiding human accidents.
+bool Plane::is_enforced_flying() const
+{
+    // Note: plane might always be in the flying mode when the takeoff is unsafe
+    return g2.demo_ground_thr
+        || (AP::baro().healthy() && AP::baro().get_altitude() >= 3)
+        || (AP::baro().healthy() && AP::baro().get_altitude() <= -2)
+        || (!g2.takeoff_unsafe && is_flying())
+        || (AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D && AP::ahrs().groundspeed() >= 3)
+    ;
+}
+
 // returns true if the vehicle is in landing sequence.  Intended only
 // for use in failsafe code.
 bool Plane::failsafe_in_landing_sequence() const
@@ -29,6 +43,7 @@ void Plane::rc_failsafe_short_on_event()
     case Mode::Number::STABILIZE:
     case Mode::Number::ACRO:
     case Mode::Number::FLY_BY_WIRE_A:
+    case Mode::Number::FLY_BY_WIRE_T:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
     case Mode::Number::FLY_BY_WIRE_C:
@@ -40,9 +55,9 @@ void Plane::rc_failsafe_short_on_event()
         }
         if(g.fs_action_short == FS_ACTION_SHORT_FBWA) {
             set_mode(mode_fbwa, ModeReason::RADIO_FAILSAFE);
-        } else if (g.fs_action_short == FS_ACTION_SHORT_FBWB) {
+        } else if (g.fs_action_short == FS_ACTION_SHORT_FBWB && (!airspeed.enabled() || is_enforced_flying())) {  // Prevent unexpected throttle by failsafe  on the ground when armed
             set_mode(mode_fbwb, ModeReason::RADIO_FAILSAFE);
-        } else if (g.fs_action_short == FS_ACTION_SHORT_FBWC) {
+        } else if (g.fs_action_short == FS_ACTION_SHORT_FBWC && is_enforced_flying()) {  // Prevent unexpected throttle by failsafe  on the ground when armed
             set_mode(mode_fbwc, ModeReason::RADIO_FAILSAFE);
         } else {
             set_mode(mode_circle, ModeReason::RADIO_FAILSAFE); // circle if action = 0 or 1 
@@ -86,9 +101,9 @@ void Plane::rc_failsafe_short_on_event()
             failsafe.saved_mode_number = control_mode->mode_number();
             if (g.fs_action_short == FS_ACTION_SHORT_FBWA) {
                 set_mode(mode_fbwa, ModeReason::RADIO_FAILSAFE);
-            } else if (g.fs_action_short == FS_ACTION_SHORT_FBWB) {
+            } else if (g.fs_action_short == FS_ACTION_SHORT_FBWB && (!airspeed.enabled() || is_enforced_flying())) {
                 set_mode(mode_fbwb, ModeReason::RADIO_FAILSAFE);
-            } else if (g.fs_action_short == FS_ACTION_SHORT_FBWC) {
+            } else if (g.fs_action_short == FS_ACTION_SHORT_FBWC && is_enforced_flying()) {
                 set_mode(mode_fbwc, ModeReason::RADIO_FAILSAFE);
             } else {
                 set_mode(mode_circle, ModeReason::RADIO_FAILSAFE);
@@ -120,6 +135,20 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
         AP_Notify::flags.failsafe_gcs = true;
     }
 
+    bool fs_allowed;
+    switch (control_mode->mode_number())
+    {
+    case Mode::Number::FLY_BY_WIRE_B:
+        fs_allowed = !airspeed.enabled() || is_enforced_flying();
+        break;
+    case Mode::Number::FLY_BY_WIRE_C:
+        fs_allowed = is_enforced_flying();
+        break;
+    default:
+        fs_allowed = true;
+        break;
+    }
+
     // This is how to handle a long loss of control signal failsafe.
     // If the GCS is locked up we allow control to revert to RC
     RC_Channels::clear_overrides();
@@ -130,16 +159,18 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
     case Mode::Number::STABILIZE:
     case Mode::Number::ACRO:
     case Mode::Number::FLY_BY_WIRE_A:
+    case Mode::Number::FLY_BY_WIRE_T:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
-    case Mode::Number::FLY_BY_WIRE_C:
+    case Mode::Number::FLY_BY_WIRE_C:  // Allow failsafe also for FBWC to switch into RTL, Loiter, Landing when applicable
     case Mode::Number::CRUISE:
     case Mode::Number::TRAINING:
     case Mode::Number::CIRCLE:
     case Mode::Number::LOITER:
     case Mode::Number::THERMAL:
     case Mode::Number::TAKEOFF:
-        if (plane.flight_stage == AP_FixedWing::FlightStage::TAKEOFF && !(g.fs_action_long == FS_ACTION_LONG_GLIDE || g.fs_action_long == FS_ACTION_LONG_PARACHUTE)) {
+        if (fs_allowed && plane.flight_stage == AP_FixedWing::FlightStage::TAKEOFF
+        && !(g.fs_action_long == FS_ACTION_LONG_GLIDE || g.fs_action_long == FS_ACTION_LONG_PARACHUTE)) {
             // don't failsafe if in initial climb of TAKEOFF mode and FS action is not parachute or glide
             // long failsafe will be re-called if still in fs after initial climb
             long_failsafe_pending = true;
@@ -284,7 +315,7 @@ void Plane::failsafe_long_off_event(ModeReason reason)
 {
     long_failsafe_pending = false;
     // We're back in radio contact with RC or GCS
-    if (reason == ModeReason:: GCS_FAILSAFE) {
+    if (reason == ModeReason::GCS_FAILSAFE) {
         AP_Notify::flags.failsafe_gcs = false;
         gcs().send_text(MAV_SEVERITY_WARNING, "GCS Failsafe Cleared");
     }

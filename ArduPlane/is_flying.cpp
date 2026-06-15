@@ -189,7 +189,7 @@ void Plane::update_is_flying_5Hz(void)
   estimate, and needs to be used very carefully. Each use case needs
   to be thought about individually.
  */
-bool Plane::is_flying(void)
+bool Plane::is_flying(void) const
 {
     if (arming.is_armed_and_safety_off()) {
 #if HAL_QUADPLANE_ENABLED

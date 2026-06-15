@@ -256,6 +256,8 @@ static const AP_IBus_Telem::ModeMap mode_map[] {
     QACRO         = 23
     THERMAL       = 24
     LOITER_ALT_QLAND = 25
+    FLY_BY_WIRE_C = 28
+    FLY_BY_WIRE_F = 29
 */
 static const AP_IBus_Telem::ModeMap mode_map[] {
     {.ap_mode = 1, .ibus_mode = IBUS_VEHICLE_MODE_CIRCLE},

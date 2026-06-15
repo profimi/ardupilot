@@ -157,6 +157,7 @@ public:
     friend class ModeFBWA;
     friend class ModeFBWB;
     friend class ModeFBWC;
+    friend class ModeFBWT;
     friend class ModeCruise;
     friend class ModeAutoTune;
     friend class ModeAuto;
@@ -1068,6 +1069,7 @@ private:
     void failsafe_long_off_event(ModeReason reason);
     void handle_battery_failsafe(const char* type_str, const int8_t action);
     bool failsafe_in_landing_sequence() const;  // returns true if the vehicle is in landing sequence.  Intended only for use in failsafe code.
+    bool is_enforced_flying() const;  // Enforced flyting: either flying or demo flying
 
 #if AP_FENCE_ENABLED
     // fence.cpp
@@ -1192,7 +1194,7 @@ private:
     void update_is_flying_5Hz(void);
     void crash_detection_update(void);
     bool in_preLaunch_flight_stage(void);
-    bool is_flying(void);
+    bool is_flying(void) const;
 
     // parachute.cpp
     void parachute_check();

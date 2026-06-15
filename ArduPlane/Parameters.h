@@ -592,6 +592,7 @@ public:
     RF_PowerSwitch  rf_pws;
 #endif
     AP_Int8         prearm_fmode_ctl;
+    AP_Int8         demo_ground_thr;
 
 #if AP_RANGEFINDER_ENABLED
     // orientation of rangefinder to use for landing

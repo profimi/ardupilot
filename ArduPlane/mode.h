@@ -71,7 +71,7 @@ public:
         AUTOLAND      = 26,
 #endif
 
-        // Custom
+        // Custom modes
         FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronously set to this value to support Flight mode switching from RC
         FLY_BY_WIRE_T = 29,  // ATTENTION: FLTMODEn or respective AUX function's RC switch should be synchronously set to this value to support Flight mode switching from RC
         // Mode number 30 reserved for "offboard" for external/lua control.

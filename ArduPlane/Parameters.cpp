@@ -222,7 +222,8 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: USE_REV_THRUST
     // @DisplayName: Bitmask for when to allow negative reverse thrust
     // @Description: This controls when to use reverse thrust. If set to a non-zero value then the bits correspond to flight stages where reverse thrust may be used. The most commonly used value for USE_REV_THRUST is 2, which means AUTO_LAND only. That enables reverse thrust in the landing stage of AUTO mode. Another common choice is 1, which means to use reverse thrust in all auto flight stages. Reverse thrust is always used in MANUAL mode if enabled with THR_MIN < 0. In non-autothrottle controlled modes, if reverse thrust is not used, then THR_MIN is effectively set to 0 for that mode.
-    // @Bitmask: 0:AUTO_ALWAYS,1:AUTO_LAND,2:AUTO_LOITER_TO_ALT,3:AUTO_LOITER_ALL,4:AUTO_WAYPOINTS,5:LOITER,6:RTL,7:CIRCLE,8:CRUISE,9:FBWB,10:GUIDED,11:AUTO_LANDING_PATTERN,12:FBWA,13:ACRO,14:STABILIZE,15:THERMAL,16:FBWC,17:FBWT
+    // @Bitmask: 0:AUTO_ALWAYS,1:AUTO_LAND,2:AUTO_LOITER_TO_ALT,3:AUTO_LOITER_ALL,4:AUTO_WAYPOINTS,5:LOITER,6:RTL,7:CIRCLE,8:CRUISE,9:FBWB,10:GUIDED,11:AUTO_LANDING_PATTERN,12:FBWA,13:ACRO,14:STABILIZE,15:THERMAL
+    // Note: ,16:FBWC,17:FBWT are not included explicitly and share FBWV and FBWA respectively to limit the enum with 2 bytes rather than 4 bytes
     // @User: Advanced
     GSCALAR(use_reverse_thrust,     "USE_REV_THRUST",  float(UseReverseThrust::AUTO_LAND_APPROACH)),
 
@@ -1318,6 +1319,13 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // // @Increment: 1
     // // @User: Standard
     // AP_GROUPINFO("DIRLOCK_RCIN", 50, ParametersG2, dirlock_rcin, DIRLOCK_RCIN),
+
+    // @Param: DEMO_GROUND_THR
+    // @DisplayName: Allow ground throttle in failsafe modes for the demo
+    // @Description: Allow ground throttle in failsafe modes (FBWC, FBWB with airspeed enabled) for the demo
+    // @Values: 0:Disable, 1:Enable
+    // @User: Standard
+    AP_GROUPINFO("DEMO_GROUND_THR", 50, ParametersG2, demo_ground_thr, DEMO_GROUND_THR),
 
     AP_GROUPEND
 };

@@ -9,7 +9,7 @@ void Tracker::Log_Write_Attitude()
 {
     const Vector3f targets{0.0f, nav_status.pitch, nav_status.bearing};
     ahrs.Write_Attitude(targets);
-    AP::ahrs().Log_Write();
+    ahrs.Log_Write();
 }
 
 struct PACKED log_Vehicle_Baro {

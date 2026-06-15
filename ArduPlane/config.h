@@ -293,3 +293,7 @@
 // #ifndef DIRLOCK_RCIN
 //     #define DIRLOCK_RCIN 16
 // #endif
+
+#ifndef DEMO_GROUND_THR
+    #define DEMO_GROUND_THR 0  // Allow ground throttle in failsafe modes for the demo
+#endif
