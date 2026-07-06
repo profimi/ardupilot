@@ -693,10 +693,18 @@ protected:
     bool _enter() override;
 };
 
+#ifndef MODE_FBWT_ENABLED
+#define MODE_FBWT_ENABLED 1
+#endif
+
 class ModeFBWT : public Mode
 {
+    enum class Submode {
+        Levelup,  // Bailout; Recover 
+        Headhold,  // Althold
+        Fbwa
+    };
 public:
-
     Number mode_number() const override { return Number::FLY_BY_WIRE_T; }
     const char *name() const override { return "FBWT"; }
     const char *name4() const override { return "FBWT"; }
@@ -718,6 +726,13 @@ public:
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
+    // var_info for holding parameter information
+    static const struct AP_Param::GroupInfo var_info[];
+
+    AP_Int8 airspd_min;  // 1.2f * stall ~= 16 m/s
+    AP_Int8 alt_min;  // 30, 100
+    AP_Int8 pitch_min;  // -50 deg
+    // AP_Float ground_pitch;  // 
 };
 
 class ModeCruise : public Mode

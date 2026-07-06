@@ -1327,6 +1327,15 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("DEMO_GROUND_THR", 50, ParametersG2, demo_ground_thr, DEMO_GROUND_THR),
 
+#if MODE_FBWT_ENABLED
+    // @Group: RFPW_
+    // @Path: mode_fbwt.cpp
+    AP_SUBGROUPINFO(mode_fbwt, "FBWT_", 51, ParametersG2, ModeFBWT),
+#endif
+
+    // Note: run documentation building script to compile it to be shown in Mission planner:
+    // $ ./Tools/autotest/param_metadata/param_parse.py
+
     AP_GROUPEND
 };
 

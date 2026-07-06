@@ -10,7 +10,7 @@ bool Plane::is_enforced_flying() const
         || (AP::baro().healthy() && AP::baro().get_altitude() >= 3)
         || (AP::baro().healthy() && AP::baro().get_altitude() <= -2)
         || (!g2.takeoff_unsafe && is_flying())
-        || (AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D && AP::ahrs().groundspeed() >= 3)
+        || (AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D && AP::ahrs().groundspeed() >= 5)
     ;
 }
 

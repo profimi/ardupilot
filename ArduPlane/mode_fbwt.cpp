@@ -1,10 +1,79 @@
 #include "mode.h"
 #include "Plane.h"
 
+const struct AP_Param::GroupInfo ModeFBWT::var_info[] = {
+    // @Param: _AIRSPD_MIN
+    // @DisplayName: FBWT minimal airspeed (recommended: 1.2f * stall_speed)
+    // @Description: Minimum airspeed for the regular Submode::Fbwa, otherwise Submode::Headhold is activated 
+    // @Units: m/s
+    // @Range: 10 40
+    // @Increment: 1
+    AP_GROUPINFO("_AIRSPD_MIN", 1, ModeFBWT, airspd_min, FBWT_AIRSPD_MIN),
+
+    // @Param: _AIRSPD_MIN
+    // @DisplayName: FBWT minimal altitude
+    // @Description: Minimum airspeed for the regular Submode::Fbwa, otherwise Submode::Headhold is activated. 
+    // @Units: m
+    // @Range: -128 127
+    // @Increment: 1
+    AP_GROUPINFO("_ALT_MIN", 2, ModeFBWT, alt_min, FBWT_ALT_MIN),
+
+    // @Param: _AIRSPD_MIN
+    // @DisplayName: FBWT Minimal airspeed
+    // @Description: Minimum airspeed for the regular Submode::Fbwa, otherwise Submode::Headhold is activated 
+    // @Units: deg
+    // @Range: -90 .. 90
+    // @Increment: 1
+    AP_GROUPINFO("_PITCH_MIN", 3, ModeFBWT, pitch_min, FBWT_PITCH_MIN),
+
+    // // @Param: _AGGR
+    // // @DisplayName: Custom FBWT Aggression
+    // // @Description: Tuning intensity for controls.
+    // // @Values: 0:Gentle, 1:Medium, 2:Aggressive
+    // AP_GROUPINFO("_AGGR", 4, ModeFBWT, enable_aggression, 1),
+
+    AP_GROUPEND
+};
+
 void ModeFBWT::update()
 {
     static bool isDirLocked = false;
+    // bool isStall = false;
     RC_Channel *chan;
+
+    // // Limits: Height: >= 100 | 30 m, Airspeed >= 20 (Stall speed)
+    // // Pitch > -60 deg;  Nose 30° Down: -30 degrees (or -0.52 radians)
+    // // Detect limits violation including stalling  and swich to automatic recovery
+    // if(Submode::Fbwa && airspeed)
+    // AP::baro().healthy() && AP::baro().get_altitude() >= X
+    // AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D && AP::ahrs().groundspeed() >= 3
+
+    // if (plane.airspeed.enabled() && plane.airspeed.healthy()) {
+    //     float airspeed_ms = plane.airspeed.get_airspeed();
+    //     // Your flight mode logic here
+    //      if(airspeed_ms < AS_<MIN && pitch > threshold)
+    //          isStall = true;
+    // }
+    // AP::ahrs().airspeed_estimate(&estimated_airspeed)
+
+
+    // // Fetch the current pitch from AHRS (returned in radians)
+    // float current_pitch_rad = AP::ahrs().get_pitch();
+    // // Check if the nose is pointed 30 degrees down or lower
+    // if (current_pitch_rad <= DEG_TO_RAD * -30.0f) {
+    //     // Your recovery or management logic here
+    // }
+
+    // if(isStall) {
+    //     pitch_target = negative small;  // If flight height allows
+    //     throttle = max;
+    //     roll_target = 0;
+    // } else {
+    //     // Stall exit condition
+    //     isStall = false;
+    //     restore_mode();
+    // }
+
 
     // Fix directions by the RC Channel switch
     // Alternative: use plane.g2.dirlock_rcin

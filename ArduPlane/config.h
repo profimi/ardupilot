@@ -297,3 +297,19 @@
 #ifndef DEMO_GROUND_THR
     #define DEMO_GROUND_THR 0  // Allow ground throttle in failsafe modes for the demo
 #endif
+
+#ifndef DEMO_GROUND_THR
+    #define DEMO_GROUND_THR 0  // Allow ground throttle in failsafe modes for the demo
+#endif
+
+#ifndef FBWT_AIRSPD_MIN
+    #define FBWT_AIRSPD_MIN  16
+#endif
+
+#ifndef FBWT_ALT_MIN
+    #define FBWT_ALT_MIN  30
+#endif
+
+#ifndef FBWT_PITCH_MIN
+    #define FBWT_PITCH_MIN  -60
+#endif

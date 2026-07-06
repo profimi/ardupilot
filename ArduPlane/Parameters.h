@@ -593,6 +593,7 @@ public:
 #endif
     AP_Int8         prearm_fmode_ctl;
     AP_Int8         demo_ground_thr;
+    ModeFBWT        mode_fbwt;
 
 #if AP_RANGEFINDER_ENABLED
     // orientation of rangefinder to use for landing
