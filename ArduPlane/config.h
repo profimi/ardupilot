@@ -235,7 +235,7 @@
 #endif
 
 #ifndef PREARM_FMODE_CTL
-    #define PREARM_FMODE_CTL 1
+    #define PREARM_FMODE_CTL 0
 #endif
 
 #ifndef RF_POWER_OFF_TIME1
@@ -312,4 +312,8 @@
 
 #ifndef FBWT_PITCH_MIN
     #define FBWT_PITCH_MIN  -60
+#endif
+
+#ifndef CTL_EXPOCRV
+    #define CTL_EXPOCRV  0.3f
 #endif

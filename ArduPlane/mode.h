@@ -697,43 +697,216 @@ protected:
 #define MODE_FBWT_ENABLED 1
 #endif
 
-class ModeFBWT : public Mode
-{
+class ModeFBWT : public Mode {
+public:
     enum class Submode {
-        Levelup,  // Bailout; Recover 
-        Headhold,  // Althold
+        Levelup,
+        Headhold,
         Fbwa
     };
-public:
+
+    enum FBWTPhase {  // What how and how is it defined?
+        PHASE_TAKEOFF,
+        PHASE_CLIMB,
+        PHASE_CRUISE,
+        PHASE_MANEUVER,
+        PHASE_DESCENT,
+        PHASE_LANDING
+    };
+
+    struct EnvelopeLimits {
+        float pitch_max;
+        float pitch_min;
+        float roll_max;
+    };
+
+    // friend class Plane;
+
+    // ModeFBWT(Plane &plane);
+
     Number mode_number() const override { return Number::FLY_BY_WIRE_T; }
     const char *name() const override { return "FBWT"; }
     const char *name4() const override { return "FBWT"; }
 
-    // methods that affect movement of the vehicle in this mode
+    // bool _enter() override;
     void update() override;
-    
-    bool mode_allows_autotuning() const override { return true; }
-
     void run() override;
+    // void navigate() override;
+
+    bool mode_allows_autotuning() const override { return submode == Submode::Fbwa; }
 
 #if AP_PLANE_SYSTEMID_ENABLED
     // does this mode support fixed wing systemid?
-    bool supports_fw_systemid() const override { return true; }
+    bool supports_fw_systemid() const override { return mode_allows_autotuning(); }
 #endif
 
 #if MODE_AUTOLAND_ENABLED   
     // true if mode allows landing direction to be set on first takeoff after arm in this mode 
-    bool allows_autoland_direction_capture() const override { return true; }
+    bool allows_autoland_direction_capture() const override { return submode != Submode::Levelup; }
 #endif
+
+    // Levelup and Headhold are auto-throttle (TECS-driven); Fbwa is manual throttle
+    bool does_auto_throttle() const override { return submode != Submode::Fbwa; }
+
+    // Headhold only actively steers via the navigation controller when it
+    // actually has a usable position to feed it (see have_position()); if
+    // GPS/position is unavailable this evaluates to false and update()
+    // instead runs a direct compass-only heading-hold fallback.
+     bool does_auto_navigation() const override { return submode == Submode::Headhold && have_position(); }
+
+     // Don't let stick-mixing fight the bailout/hold controller
+     bool allows_throttle_nudging() const override { return submode == Submode::Headhold; }
+
+     Submode get_submode() const { return submode; }
+
+    // Update_target_altitude() is deliberately a no-op, like FBWB/CRUISE:
+    // the Headhold target altitude is latched once (in run_levelup()) and
+    // is not ramped every loop from a pilot input.
+    void update_target_altitude() override {}
 
     // var_info for holding parameter information
     static const struct AP_Param::GroupInfo var_info[];
 
-    AP_Int8 airspd_min;  // 1.2f * stall ~= 16 m/s
-    AP_Int8 alt_min;  // 30, 100
-    AP_Int8 pitch_min;  // -50 deg
-    // AP_Float ground_pitch;  // 
+protected:
+    // headhold(bool &isDirLocked, bool doPitchLock);  // Execute headhold
+
+    bool _enter() override;
+private:
+    struct EnvelopeLimits {
+        float aoa_max;
+        float n_max;
+        float energy_min;
+        float energy_max;
+        float limiter_floor;
+    };
+
+    Submode submode = Submode::Fbwa;
+
+    // Parameters
+    const uint8_t alt_hyst = 10;  // m
+    AP_Int8 alt_min;  // 30 - 50 m
+    // AP_Int8 pitch_min;  // -60, -50 deg; pitch_max ~45 deg
+    AP_Int8 pitch_max;
+    AP_Int8 roll_max;  // 25 .. 45
+    AP_Float ctl_expocrv;  // 0.3f; 0 means disabled
+
+    // AoA limits
+    float alpha_stall = radians(15.0f);
+    float alpha_limit = radians(12.0f);
+
+    // G-limits
+    float nz_max = 4.0f;
+    float nz_min = -2.0f;
+
+    // Assist gains
+    float assist_gain = 1.0f;
+    float assist_decay = 0.995f;
+
+    // State
+    float target_alt = 0;
+    float target_heading = 0;
+    float cur_airspeed = 0;  // Current airspeed
+
+    // // Headhold hold-state, latched by enter_headhold()/run_levelup()
+    // int32_t  locked_heading_cd;
+    // uint32_t levelup_enter_ms;
+
+    // // Altitude reference used when home was never set (no GPS/position
+    // // ever available during this FBWT activation) - see reference_alt_cm().
+    // int32_t  no_home_ref_alt_cm;
+
+    // Flags
+    bool has_gps = false;
+    bool has_velocity = false;
+    bool has_airspeed = false;
+
+    // --- Core functions ---
+    void update_submode();
+    void apply_envelope_limits(float &pitch, float &roll);
+
+
+
+    void run_fbwa();
+    void run_levelup();
+    void run_headhold();  // run_headhold_heading_only
+
+    // void enter_fbwa();
+    // void enter_levelup();
+    // void enter_headhold();
+
+    // --- Protection ---
+    float compute_alpha();
+    float stall_factor(float alpha);
+    float g_limit_factor(float nz);
+    float energy_factor();
+    void apply_envelope(float &pitch, float &roll);
+    float get_aoa() const;
+    float get_flight_path_angle() const;
+
+    bool have_position() const;
+    // int32_t reference_alt_cm() const;
+    // bool speed_available(float &eas) const;
+    // bool speed_too_low(float &margin_ms) const;
+    // bool is_stalling() const;
+    // bool pitch_too_low() const;
+    // bool alt_too_low() const;
+    // bool bailout_condition(bool &stalling) const;
+
+    // --- Helpers ---
+    FBWTPhase detect_phase() const; 
+    EnvelopeLimits get_phase_limits(FBWTPhase phase) const;
+    float compute_envelope_limiter() const;
+    float get_load_factor() const;
+    float get_energy_rate() const;
+    float compute_energy_limiter() const;
+    float compute_energy_factor() const;
+    float compute_energy() const;
 };
+
+// class ModeFBWT : public Mode
+// {
+//     enum class Submode {
+//         Levelup,  // Bailout; Recover 
+//         Headhold,  // Althold
+//         Fbwa
+//     };
+// protected:
+//     Submode submode;
+//     uint16_t alt_max;  // Max reached altitude module
+//     uint16_t airspd_max;  // Max reached airspeed
+//     uint16_t airspd_min;  // 1.2f * stall ~= 16 m/s
+//     // float yaw_targ;  // In rad
+// public:
+//     ModeFBWT();
+//     Number mode_number() const override { return Number::FLY_BY_WIRE_T; }
+//     const char *name() const override { return "FBWT"; }
+//     const char *name4() const override { return "FBWT"; }
+
+//     // methods that affect movement of the vehicle in this mode
+//     void update() override;
+
+//     void run() override;
+    
+//     bool mode_allows_autotuning() const override { return true; }
+
+// #if AP_PLANE_SYSTEMID_ENABLED
+//     // does this mode support fixed wing systemid?
+//     bool supports_fw_systemid() const override { return true; }
+// #endif
+
+// #if MODE_AUTOLAND_ENABLED   
+//     // true if mode allows landing direction to be set on first takeoff after arm in this mode 
+//     bool allows_autoland_direction_capture() const override { return true; }
+// #endif
+
+//     // var_info for holding parameter information
+//     static const struct AP_Param::GroupInfo var_info[];
+
+//     AP_Int8 alt_min;  // 30, 100
+//     AP_Int8 pitch_min;  // -50 deg
+//     // AP_Int8 airspd_min;  // 1.2f * stall ~= 16 m/s
+//     // AP_Float ground_pitch;
+// };
 
 class ModeCruise : public Mode
 {
