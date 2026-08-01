@@ -1,6 +1,7 @@
 #include "mode.h"
 #include "Plane.h"
 
+// TODO: Check all TODOs, use Arduplane params insted of predefined constants
 // No new parameters are used, everythins is derieved from: aparm, TECS, AHR, airspeed (optional_)
 
 // Adrupilot introduces some standard parameters:
@@ -64,17 +65,17 @@ static float blend_limits(float prev, float target, float alpha)
     return prev + alpha * (target - prev);
 }
 
-static float estimate_load_factor_cd(float roll_cd)
-{
-    float phi = radians(roll_cd * 0.01f);
-    return 1.0f / MAX(cosf(phi), 0.1f);
-}
-
-// static float estimate_load_factor(float roll_deg)
+// static float estimate_load_factor_cd(float roll_cd)
 // {
-//     float phi = radians(roll_deg);
+//     float phi = radians(roll_cd * 0.01f);
 //     return 1.0f / MAX(cosf(phi), 0.1f);
 // }
+
+static float estimate_load_factor(float roll_deg)
+{
+    float phi = radians(roll_deg);
+    return 1.0f / MAX(cosf(phi), 0.1f);
+}
 
 // Sidesleep (beta) estimatio
 float ModeFBWT::estimate_beta()
@@ -116,40 +117,27 @@ void ModeFBWT::apply_dynamic_stall(float &pitch_cmd, float Nz)
 // AoA and Stall Protection
 void ModeFBWT::apply_stall_protection(float &pitch_cmd, float airspeed, float Nz)
 {
-    float aoa = 0.0f;
-    bool aoa_valid = false;
-
-#if AP_AHRS_ENABLED
-    if (plane.ahrs.airspeed_sensor_enabled()) {
-        aoa = plane.ahrs.getAOA();
-        aoa_valid = isfinite(aoa);
-    }
-#endif
+    float aoa = plane.ahrs.getAOA();
+    bool aoa_valid = isfinite(aoa);
 
     if (aoa_valid) {
-        const float aoa_limit = radians(15.0f);  // conservative stall AoA
+        const float aoa_lim = radians(15.0f);
 
-        if (aoa > aoa_limit && pitch_cmd > 0) {
-            float scale = constrain_float((aoa_limit - aoa) / aoa_limit, 0.0f, 1.0f);
+        if (aoa > aoa_lim && pitch_cmd > 0) {
+            float scale = constrain_float((aoa_lim - aoa)/aoa_lim, 0.0f, 1.0f);
             pitch_cmd *= scale;
         }
         return;
     }
 
-    // --- Fallback: airspeed-based ---
-    const float vmin = plane.aparm.airspeed_min;
+    float vmin = plane.aparm.airspeed_min;
     const float margin = 1.3f;
 
     if (airspeed > 0 && airspeed < vmin * margin) {
         float scale = airspeed / (vmin * margin);
 
-        if (pitch_cmd > 0) {
-            pitch_cmd *= scale;
-        }
-
-        if (Nz > 1.0f) {
-            pitch_cmd *= (1.0f / Nz);
-        }
+        if (pitch_cmd > 0) pitch_cmd *= scale;
+        if (Nz > 1.0f) pitch_cmd *= (1.0f / Nz);
     }
 }
 
@@ -159,9 +147,8 @@ float ModeFBWT::compute_adaptive_nz_limit(float airspeed)
     const float nz_high = 2.5f;  // conservative structural limit
     const float nz_low  = 1.2f;
 
-    if (airspeed <= 0) {
+    if (airspeed <= 0)
         return 2.0f;
-    }
 
     float vmin = plane.aparm.airspeed_min;
     float vmax = plane.aparm.airspeed_max;
@@ -174,16 +161,13 @@ float ModeFBWT::compute_adaptive_nz_limit(float airspeed)
 // Load factor NZ limiter with adaptive limit
 void ModeFBWT::apply_nz_limit(float &roll_cmd, float airspeed)
 {
-    float nz_limit = compute_adaptive_nz_limit(airspeed);  // 2.5 is a conservative structural limit
+    float nz_lim = compute_adaptive_nz_limit(airspeed);
 
-    float phi = radians(roll_cmd);
-    float Nz = 1.0f / MAX(cosf(phi), 0.1f);
+    float Nz = estimate_load_factor(roll_cmd);
 
-    if (Nz > nz_limit) {
-        float phi_limit = acosf(1.0f / nz_limit);
-        float roll_limit_deg = degrees(phi_limit);
-
-        roll_cmd = constrain_symmetric(roll_cmd, roll_limit_deg);
+    if (Nz > nz_lim) {
+        float phi = acosf(1.0f / nz_lim);
+        roll_cmd = constrain_symmetric(roll_cmd, degrees(phi));
     }
 }
 
@@ -231,46 +215,39 @@ void ModeFBWT::apply_energy_limiter(float &pitch_cmd)
     if (STEdot < sink_limit && pitch_cmd > 0) {
         float scale = constrain_float((STEdot - sink_limit) / sink_limit, 0.0f, 1.0f);
         pitch_cmd *= scale;
+        // Or just:  pitch_cmd *= 0.5f;
     }
 
     if (STEdot > climb_limit && pitch_cmd < 0) {
         float scale = constrain_float((climb_limit - STEdot) / climb_limit, 0.0f, 1.0f);
         pitch_cmd *= scale;
+        // Or just:  pitch_cmd *= 0.5f;
     }
 }
 
-// Turn coordination assisted by rubber
+// Turn coordination (beta-based)
 void ModeFBWT::apply_turn_coordination(float roll_cmd)
 {
-    float yaw_rate = plane.ahrs.get_gyro().z;  // rad/s
+    float beta = estimate_beta();
 
-    // desired yaw rate ≈ g * tan(phi) / V
-    float airspeed = plane.airspeed_estimate();
+    float rudder = constrain_float(-beta * 2.0f, -1.0f, 1.0f);
 
-    if (airspeed < 5.0f) {
-        return;
-    }
-
-    float phi = radians(roll_cmd);
-    float desired_yaw_rate = GRAVITY_MSS * tanf(phi) / airspeed;
-
-    float yaw_error = desired_yaw_rate - yaw_rate;
-
-    float rudder_cmd = constrain_float(yaw_error * 0.5f, -1.0f, 1.0f);
-
-    plane.channel_rudder->set_servo_out(rudder_cmd * 4500); // centideg equivalent
+    plane.channel_rudder->set_servo_out(rudder * 4500);
 }
 
 // Combined envelope limiter
 void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
 {
     float airspeed = plane.airspeed_estimate();
-
-    float Nz = estimate_load_factor_cd(roll_cmd * 100.0f);
+    float Nz = estimate_load_factor(roll_cmd);
 
     apply_nz_limit(roll_cmd, airspeed);
+    apply_energy_roll_limit(roll_cmd);
+
     apply_stall_protection(pitch_cmd, airspeed, Nz);
+    apply_dynamic_stall(pitch_cmd, Nz);
     apply_energy_limiter(pitch_cmd);
+    apply_terrain_protection(pitch_cmd);
 }
 
 // Main function
@@ -286,7 +263,6 @@ void ModeFBWT::update()
     float pitch_cmd = pitch_in * (pitch_in > 0 ? pitch_max : -pitch_min);
     float roll_cmd  = roll_in  * roll_max;
 
-    // --- Submodes restored ---
     switch (_submode) {
 
     case FBWT_SUBMODE_FBWA:
@@ -306,28 +282,24 @@ void ModeFBWT::update()
         break;
     }
 
-    // --- Envelope ---
     apply_envelope_limits(roll_cmd, pitch_cmd);
 
-    // --- Write outputs ---
     plane.nav_pitch_cd = pitch_cmd * 100.0f;
     plane.nav_roll_cd  = roll_cmd  * 100.0f;
 
-    // --- Rudder coordination ---
     apply_turn_coordination(roll_cmd);
 
-    // --- Logging ---
     if (plane.g.log_bitmask & MASK_LOG_ATTITUDE_FAST) {
         AP::logger().Write(
             "FBWT",
-            "TimeUS,RollIn,PitchIn,RollCmd,PitchCmd,Nz,Spd",
+            "TimeUS,Rin,Pin,Rcmd,Pcmd,Nz,Spd",
             "Qffffff",
             AP_HAL::micros64(),
             roll_in,
             pitch_in,
             roll_cmd,
             pitch_cmd,
-            estimate_load_factor_cd(plane.nav_roll_cd),
+            estimate_load_factor(roll_cmd),
             plane.airspeed_estimate()
         );
     }
