@@ -173,10 +173,10 @@ void ModeFBWT::apply_nz_limit(float &roll_cmd, float airspeed)
 // Energy-aware roll limiting
 // void ModeFBWT::apply_energy_roll_limit(float &roll_cmd)
 // {
-//     AP_TECS *tecs = plane.tecs;
-//     if (!tecs) return;
+//     // AP_TECS *_tecs = plane._tecs;
+//     if (!_tecs) return;
 
-//     float STEdot = tecs->get_SPDot();
+//     float STEdot = _tecs->get_SPDot();
 
 //     if (STEdot < -3.0f) {
 //         float scale = constrain_float((STEdot + 5.0f) / 2.0f, 0.3f, 1.0f);
@@ -292,11 +292,11 @@ void ModeFBWT::apply_flare_protection(float &pitch_cmd)
 // TECS energy limiter
 void ModeFBWT::apply_energy_limiter(float &pitch_cmd)
 {
-    AP_TECS *tecs = plane.tecs;
-    if (!tecs)
+    // AP_TECS *_tecs = plane._tecs;
+    if (!_tecs)
         return;
 
-    float STEdot = tecs->get_SPDot();
+    float STEdot = _tecs->get_SPDot();
 
     const float sink_limit = -5.0f;  // m/s
     const float climb_limit = 5.0f;  // TODO: Load from Arduplane params
@@ -407,7 +407,7 @@ bool ModeFBWT::is_below_alt_min()
     // // Smooth the noise
     // auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f * sink_rate;    
 
-    return (alt < alt_min && (sink_rate > 1 || alt < alt_min - alt_hyst/2));
+    return (sink_rate > 0 && alt < alt_min + sink_rate*3);
 }
 
 // Levelup controller
@@ -423,6 +423,7 @@ void ModeFBWT::apply_levelup_protection(float &roll_cmd, float &pitch_cmd)
 
     // Prevent nose-down
     pitch_cmd = MAX(pitch_cmd, 5.0f);
+    _submode = Submode::Levelup;
 }
 
 void ModeFBWT::apply_final_envelope(float &roll_cmd, float &pitch_cmd)
@@ -440,6 +441,7 @@ void ModeFBWT::apply_final_envelope(float &roll_cmd, float &pitch_cmd)
     // 3) Low-altitude protection (highest priority)
     if (is_below_alt_min())
         apply_levelup_protection(roll_cmd, pitch_cmd);
+    else _submode = Submode::Fbwa;
 }
 
 // Angle of Attack estimation and protection
@@ -503,6 +505,43 @@ void ModeFBWT::apply_aoa_rate_damping(float &pitch_cmd)
     }
 }
 
+void ModeFBWT::apply_aoa_limiter(float &pitch_cmd)
+{
+    float aoa_meas = 0.0f;
+    float aoa_est  = estimate_aoa();   // fallback estimate
+    bool aoa_valid = false;
+
+#if AP_AHRS_ENABLED
+    if (plane.ahrs.airspeed_sensor_enabled()) {
+        aoa_meas = plane.ahrs.getAOA();
+        aoa_valid = isfinite(aoa_meas);
+    }
+#endif
+
+    // Blend measured + estimated AoA
+    float aoa = aoa_valid ? (0.7f * aoa_meas + 0.3f * aoa_est) : aoa_est;
+
+    const float aoa_soft = radians(12.0f);
+    const float aoa_hard = radians(15.0f);
+
+    if (aoa > aoa_soft) {
+
+        float t = constrain_float((aoa - aoa_soft) / (aoa_hard - aoa_soft), 0.0f, 1.0f);
+
+        // progressively remove pitch-up authority
+        float scale = 1.0f - t;
+
+        if (pitch_cmd > 0) {
+            pitch_cmd *= scale;
+        }
+
+        // hard clamp at stall
+        if (aoa > aoa_hard) {
+            pitch_cmd = MIN(pitch_cmd, 0.0f);
+        }
+    }
+}
+
 // Combined envelope limiter
 void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
 {
@@ -520,11 +559,12 @@ void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
     apply_stall_protection(pitch_cmd, airspeed, Nz);
     // AoA-based (if sensor or estimate available)
     float aoa = get_fused_aoa();
-    apply_aoa_protection(pitch_cmd, aoa);
+    apply_aoa_protection(pitch_cmd, aoa);  // 1. Soft AoA-based shaping
     // Dynamic CL-based stall protection
     apply_dynamic_stall(pitch_cmd, Nz);
     // AoA-rate damping (pre-buffer)
-    apply_aoa_rate_damping(pitch_cmd);
+    apply_aoa_rate_damping(pitch_cmd);  // 2. Dynamic AoA-based dumping
+    apply_aoa_limiter(pitch_cmd);  // 3. Hard AoA-baed limit (last)
 
     // TECS-based energy management
     apply_energy_limiter(pitch_cmd);
@@ -532,6 +572,59 @@ void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
     apply_terrain_protection(pitch_cmd);
 
     apply_final_envelope(roll_cmd, pitch_cmd);
+
+    EnvelopeState est;
+    update_envelope_state(est)
+    log_envelope(est);
+}
+
+void ModeFBWT::update_envelope_state(EnvelopeState &env)
+{
+    // --- AoA ---
+    env.aoa = sensors.aoa_deg;
+    env.aoa_limit = aoa_protection_limit_deg;
+
+    env.aoa_margin = constrain_float(
+        (env.aoa_limit - env.aoa) / env.aoa_limit,
+        0.0f, 1.0f
+    );
+
+    // --- G-load ---
+    env.load_factor = sensors.nz;
+    env.g_limit = g_limit_max;
+
+    env.g_margin = constrain_float(
+        (env.g_limit - env.load_factor) / env.g_limit,
+        0.0f, 1.0f
+    );
+
+    // --- Airspeed ---
+    env.airspeed = sensors.airspeed;
+    env.v_min = airspeed_min_safe;
+
+    env.v_margin = constrain_float(
+        (env.airspeed - env.v_min) / env.v_min,
+        0.0f, 1.0f
+    );
+
+    // --- Energy (TECS) ---
+    float e_total = _tecs.get_total_energy();
+    float e_target = _tecs.get_target_energy();
+
+    env.energy_error = e_target - e_total;
+
+    env.energy_margin = constrain_float(
+        1.0f - fabsf(env.energy_error) / energy_error_max,
+        0.0f, 1.0f
+    );
+
+    // --- Limiter flags ---
+    env.limiter_flags = 0;
+
+    if (env.aoa_margin < 0.2f) env.limiter_flags |= 1 << 0;
+    if (env.g_margin   < 0.2f) env.limiter_flags |= 1 << 1;
+    if (env.v_margin   < 0.2f) env.limiter_flags |= 1 << 2;
+    if (env.energy_margin < 0.2f) env.limiter_flags |= 1 << 3;
 }
 
 // Main function
@@ -586,6 +679,27 @@ void ModeFBWT::update()
             estimate_beta()
         );
     }
+}
+
+void ModeFBWT::log_envelope(const EnvelopeState &env)
+{
+    AP::logger().Write("ENVP",
+        "TimeUS,AoA,AoALim,AoAMargin,G,GLim,GMargin,V,Vmin,VMargin,Eerr,Emargin,Flags",
+        "QffffffffffffB",
+        AP_HAL::micros64(),
+        env.aoa,
+        env.aoa_limit,
+        env.aoa_margin,
+        env.load_factor,
+        env.g_limit,
+        env.g_margin,
+        env.airspeed,
+        env.v_min,
+        env.v_margin,
+        env.energy_error,
+        env.energy_margin,
+        env.limiter_flags
+    );
 }
 
 // void ModeFBWT::update()
@@ -939,18 +1053,18 @@ void ModeFBWT::update()
 // //     bool stall = alpha > alpha_limit;
 // //     bool low_alt = alt < alt_min;
 
-// //     switch (submode) {
+// //     switch (_submode) {
 
 // //     case Submode::Fbwa:
 // //         if (stall || low_alt) {
-// //             submode = Submode::Levelup;
+// //             _submode = Submode::Levelup;
 // //             assist_gain = 1.0f;
 // //         }
 // //         break;
 
 // //     case Submode::Levelup:
 // //         if (alt > alt_min + alt_hyst) {
-// //             submode = Submode::Headhold;
+// //             _submode = Submode::Headhold;
 // //             target_alt = alt;
 // //             target_heading = plane.ahrs.yaw;
 // //         }
@@ -959,7 +1073,7 @@ void ModeFBWT::update()
 // //     case Submode::Headhold:
 // //         assist_gain *= assist_decay;
 // //         if (assist_gain < 0.2f) {
-// //             submode = Submode::Fbwa;
+// //             _submode = Submode::Fbwa;
 // //         }
 // //         break;
 // //     }
@@ -1076,7 +1190,7 @@ void ModeFBWT::update()
 
 // float ModeFBWT::get_phase_weight()
 // {
-//     switch(submode) {
+//     switch(_submode) {
 //     case Submode::Levelup:  // Climb
 //         return 0.8f;   // favor rate
 //     case Submode::Headhold: 
@@ -1353,7 +1467,7 @@ void ModeFBWT::update()
 //     // float roll_cmd  = 0;
 
 //     // --- Submode behavior ---
-//     switch (submode) {
+//     switch (_submode) {
 //     case Submode::Levelup:
 //         run_levelup();
 //         break;
@@ -1367,7 +1481,7 @@ void ModeFBWT::update()
 //     }
 // }
 
-// // ModeFBWT::ModeFBWT(): isDirLocked{false}, submode{Submode::Fbwa}, alt_max{0}, airspd_max{0}
+// // ModeFBWT::ModeFBWT(): isDirLocked{false}, _submode{Submode::Fbwa}, alt_max{0}, airspd_max{0}
 // //     , airspd_min(roundf(aparm.airspeed_min + (aparm.airspeed_cruise - aparm.airspeed_min) / 10.f))
 // // {}
 
@@ -1398,28 +1512,48 @@ void ModeFBWT::update()
 // //     // SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, locked_throttle);
 // // }
 
-// bool ModeFBWT::_enter()
-// {
-// #if HAL_SOARING_ENABLED
-//     // for ArduSoar soaring_controller
-//     plane.g2.soaring_controller.init_cruising();
-// #endif
+bool ModeFBWT::_enter()
+{
+#if HAL_SOARING_ENABLED
+    // for ArduSoar soaring_controller
+    plane.g2.soaring_controller.init_cruising();
+#endif
 
-//     if (!AP::ahrs().healthy()) {
-//         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX: AHRS is not healthy, FBWT is unstable");
-//         // Note: It makes sense to allow FBWC even for unhealthy AHRS, moving the responsibility to pilot
-//         // return false;
-//     }
+    if (!AP::ahrs().healthy()) {
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "VTX: AHRS is not healthy, FBWT is unstable");
+        // Note: It makes sense to allow FBWC even for unhealthy AHRS, moving the responsibility to pilot
+        // return false;
+    }
 
-//     // plane.set_target_altitude_current();
-//     // target_yaw = AP::ahrs().get_yaw_rad();
+    // plane.set_target_altitude_current();
+    // target_yaw = AP::ahrs().get_yaw_rad();
 
-//     // Resent the submode toe the FBWA like
-//     submode = Submode::Fbwa;
-//     // isDirLocked = false;
+    // Use ArduPlane's existing TECS controller.
+    _tecs = &plane.TECS_controller;
 
-//     return true;
-// }
+    // Resent the submode toe the FBWA like
+    _submode = Submode::Fbwa;
+    // isDirLocked = false;
+
+    // Reset FBWT state.
+    _aoa_fused = 0.0f;
+    _aoa_rate = 0.0f;
+    _prev_aoa = 0.0f;
+
+    _pitch_cmd_prev = 0.0f;
+    _roll_cmd_prev = 0.0f;
+
+    _active_limiters = 0;
+
+    return true;
+}
+
+void ModeFBWT::_exit()
+{
+    _tecs = nullptr;
+
+    _active_limiters = 0;
+}
 
 // // void ModeFBWT::update()
 // // {
@@ -1490,18 +1624,18 @@ void ModeFBWT::update()
 // //     //     restore_mode();
 // //     // }
 
-// //     switch(submode) {
+// //     switch(_submode) {
 // //     case Submode::Levelup:
 // //         // isDirLocked = false;
 // //         // Check exit conditions:
 // //         if(alt && alt > alt_min + 5)
-// //            submode =  Submode::Fbwa;
+// //            _submode =  Submode::Fbwa;
 
 // //         // TODO: complete automaticcontrol to recover from the stall state (increase speed and then switch to the horizontal flight) and then adjust the target altitude and direction
 // //         // plane.set_target_altitude_current();
 // //         // target_yaw = AP::ahrs().get_yaw_rad();
 // //         ///
-// //         // submode =  Submode::Fbwa;
+// //         // _submode =  Submode::Fbwa;
 // //         break;
 // //     case Submode::Headhold:
 // //         // Lock in this
@@ -1563,3 +1697,470 @@ void ModeFBWT::update()
 
 // //     output_pilot_throttle();
 // // }
+
+// float ModeFBWT::get_recovery_assist_gain() const
+// {
+//     if (_submode == Submode::Fbwa)  // _submode != Submode::Levelup
+//         return 0.0f;
+// 
+//     float aoa = get_fused_aoa();
+//     float energy = get_energy_factor();
+// 
+//     float aoa_need =
+//         constrain_float(
+//             (aoa - aoa_soft_limit) /
+//             (aoa_hard_limit - aoa_soft_limit),
+//             0.0f, 1.0f);
+// 
+//     float energy_need = 1.0f - energy;
+// 
+//     float assist = MAX(aoa_need, energy_need);
+// 
+//     return constrain_float(assist, 0.0f, 1.0f);
+// }
+// 
+// void ModeFBWT::output_fbwt_throttle_assist()
+// {
+//     float pilot = plane.channel_throttle->norm_input();
+// 
+//     // 0..1, where 1 means strong recovery assistance.
+//     float assist = get_recovery_assist_gain();
+// 
+//     // Automatic recovery throttle demand.
+//     float recovery = compute_recovery_throttle();
+// 
+//     float throttle =
+//         pilot * (1.0f - assist) +
+//         recovery * assist;
+// 
+//     throttle = constrain_float(throttle, 0.0f, 1.0f);
+// 
+//     plane.throttle_suppression = false;
+//     plane.set_servos_manual_passthrough(); // NOT necessarily appropriate
+// }
+
+float ModeFBWT::get_energy_factor() const
+{
+    const float e_rate = get_energy_rate();
+
+    if (!isfinite(e_rate)) {
+        return 1.0f;
+    }
+
+    /*
+     * Positive or approximately neutral energy rate:
+     * no throttle assistance required.
+     */
+    if (e_rate >= -0.5f) {
+        return 1.0f;
+    }
+
+    /*
+     * -1.0 -> 0.0
+     * -0.5 -> 0.5
+     *
+     * Clamp the lower bound so the protection doesn't
+     * disappear completely.
+     */
+    return constrain_float(
+        1.0f + e_rate,
+        0.3f,
+        1.0f
+    );
+}
+
+float ModeFBWT::compute_recovery_throttle() const
+{
+    /*
+     * Start at the aircraft's normal cruise throttle and
+     * increase toward THR_MAX according to energy deficit.
+     */
+
+    float cruise =
+        constrain_float(
+            plane.aparm.throttle_cruise * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+    float maximum =
+        constrain_float(
+            plane.aparm.throttle_max * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+
+    if (maximum < cruise) {
+        maximum = cruise;
+    }
+
+
+    // ------------------------------------------------------------
+    // Energy state
+    // ------------------------------------------------------------
+
+    const float energy_factor =
+        constrain_float(
+            get_energy_factor(),
+            0.0f,
+            1.0f
+        );
+
+    const float deficit =
+        1.0f - energy_factor;
+
+
+    // ------------------------------------------------------------
+    // Cruise -> maximum throttle.
+    // ------------------------------------------------------------
+
+    float recovery =
+        cruise +
+        deficit * (maximum - cruise);
+
+
+    // ------------------------------------------------------------
+    // Severe stall condition:
+    //
+    // Don't reduce throttle below cruise, but don't use AoA
+    // itself as a reason to blindly command maximum throttle.
+    // The AoA limiter is responsible for unloading the aircraft.
+    // ------------------------------------------------------------
+
+    const float aoa = get_fused_aoa();
+
+    if (isfinite(aoa) &&
+        aoa > _aoa_limit_deg) {
+
+        recovery =
+            MAX(
+                recovery,
+                cruise
+            );
+    }
+
+
+    return constrain_float(
+        recovery,
+        cruise,
+        maximum
+    );
+}
+
+float ModeFBWT::compute_recovery_throttle() const
+{
+    /*
+     * Start at the aircraft's normal cruise throttle and
+     * increase toward THR_MAX according to energy deficit.
+     */
+
+    float cruise =
+        constrain_float(
+            plane.aparm.throttle_cruise * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+    float maximum =
+        constrain_float(
+            plane.aparm.throttle_max * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+
+    if (maximum < cruise) {
+        maximum = cruise;
+    }
+
+
+    // ------------------------------------------------------------
+    // Energy state
+    // ------------------------------------------------------------
+
+    const float energy_factor =
+        constrain_float(
+            get_energy_factor(),
+            0.0f,
+            1.0f
+        );
+
+    const float deficit =
+        1.0f - energy_factor;
+
+
+    // ------------------------------------------------------------
+    // Cruise -> maximum throttle.
+    // ------------------------------------------------------------
+
+    float recovery =
+        cruise +
+        deficit * (maximum - cruise);
+
+
+    // ------------------------------------------------------------
+    // Severe stall condition:
+    //
+    // Don't reduce throttle below cruise, but don't use AoA
+    // itself as a reason to blindly command maximum throttle.
+    // The AoA limiter is responsible for unloading the aircraft.
+    // ------------------------------------------------------------
+
+    const float aoa = get_fused_aoa();
+
+    if (isfinite(aoa) &&
+        aoa > _aoa_limit_deg) {
+
+        recovery =
+            MAX(
+                recovery,
+                cruise
+            );
+    }
+
+
+    return constrain_float(
+        recovery,
+        cruise,
+        maximum
+    );
+}
+
+float ModeFBWT::get_throttle_assist_gain() const
+{
+    if (_submode != FBWT_SUBMODE_LEVELUP) {
+        return 0.0f;
+    }
+
+    // ------------------------------------------------------------
+    // Energy deficit
+    // ------------------------------------------------------------
+
+    const float energy_factor =
+        constrain_float(
+            get_energy_factor(),
+            0.0f,
+            1.0f
+        );
+
+    const float energy_deficit =
+        1.0f - energy_factor;
+
+
+    // ------------------------------------------------------------
+    // AoA severity
+    // ------------------------------------------------------------
+
+    float aoa_gain = 0.0f;
+
+    const float aoa = get_fused_aoa();
+
+    if (isfinite(aoa) &&
+        _aoa_limit_deg > _aoa_soft_zone_deg) {
+
+        aoa_gain =
+            constrain_float(
+                (aoa - _aoa_soft_zone_deg) /
+                (_aoa_limit_deg - _aoa_soft_zone_deg),
+                0.0f,
+                1.0f
+            );
+    }
+
+
+    // ------------------------------------------------------------
+    // Recovery demand
+    //
+    // Energy is the main reason for throttle assistance.
+    // AoA can increase assistance when the aircraft is close
+    // to the stall-protection boundary.
+    // ------------------------------------------------------------
+
+    float demand =
+        MAX(
+            energy_deficit,
+            aoa_gain * 0.5f
+        );
+
+
+    // ------------------------------------------------------------
+    // Don't immediately jump to 100% throttle.
+    //
+    // This is intentionally bounded without introducing another
+    // FBWT parameter.
+    // ------------------------------------------------------------
+
+    demand =
+        constrain_float(
+            demand,
+            0.0f,
+            1.0f
+        );
+
+    return demand;
+}
+
+void ModeFBWT::output_fbwt_throttle_assist()
+{
+    /*
+     * FBWT LEVELUP throttle assistance.
+     *
+     * Pilot throttle remains the baseline command.
+     * FBWT only adds bounded assistance when recovery
+     * requires additional energy.
+     *
+     * We deliberately preserve the two paths used by
+     * Mode::output_pilot_throttle():
+     *
+     *   THR_PASS_STAB:
+     *       plane.get_throttle_input(true)
+     *
+     *   normal FBWA-style throttle:
+     *       plane.get_adjusted_throttle_input(true)
+     */
+
+    float pilot_throttle;
+
+    // ------------------------------------------------------------
+    // 1. Obtain pilot throttle using the same mechanism as
+    //    Mode::output_pilot_throttle().
+    // ------------------------------------------------------------
+
+    if (plane.g.throttle_passthru_stabilize) {
+
+        pilot_throttle =
+            plane.get_throttle_input(true);
+
+    } else {
+
+        pilot_throttle =
+            plane.get_adjusted_throttle_input(true);
+    }
+
+
+    // ------------------------------------------------------------
+    // 2. Convert the result to normalized 0..1.
+    //
+    // ArduPlane's throttle-input helpers return the scaled
+    // throttle representation used by SRV_Channels.
+    // ------------------------------------------------------------
+
+    pilot_throttle =
+        constrain_float(
+            pilot_throttle * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+
+    // ------------------------------------------------------------
+    // 3. Determine how much automatic assistance is required.
+    // ------------------------------------------------------------
+
+    const float assist_gain =
+        get_throttle_assist_gain();
+
+
+    // ------------------------------------------------------------
+    // 4. No assistance -> exactly the normal pilot path.
+    // ------------------------------------------------------------
+
+    if (assist_gain <= 0.001f) {
+
+        if (plane.g.throttle_passthru_stabilize) {
+
+            SRV_Channels::set_output_scaled(
+                SRV_Channel::k_throttle,
+                plane.get_throttle_input(true)
+            );
+
+        } else {
+
+            SRV_Channels::set_output_scaled(
+                SRV_Channel::k_throttle,
+                plane.get_adjusted_throttle_input(true)
+            );
+        }
+
+        return;
+    }
+
+
+    // ------------------------------------------------------------
+    // 5. Calculate the recovery throttle.
+    // ------------------------------------------------------------
+
+    const float recovery_throttle =
+        compute_recovery_throttle();
+
+
+    // ------------------------------------------------------------
+    // 6. Blend pilot and recovery commands.
+    //
+    // assist_gain:
+    //
+    //     0 -> 100% pilot
+    //     1 -> 100% recovery command
+    //
+    // Normally LEVELUP remains somewhere between these.
+    // ------------------------------------------------------------
+
+    float throttle =
+        pilot_throttle * (1.0f - assist_gain) +
+        recovery_throttle * assist_gain;
+
+
+    // ------------------------------------------------------------
+    // 7. Respect existing ArduPlane throttle limits.
+    //
+    // These are standard parameters:
+    //
+    //   THR_MIN
+    //   THR_MAX
+    //
+    // See ArduPlane Parameters.cpp.
+    // ------------------------------------------------------------
+
+    const float throttle_min =
+        constrain_float(
+            plane.aparm.throttle_min * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+    const float throttle_max =
+        constrain_float(
+            plane.aparm.throttle_max * 0.01f,
+            0.0f,
+            1.0f
+        );
+
+    throttle =
+        constrain_float(
+            throttle,
+            throttle_min,
+            throttle_max
+        );
+
+
+    // ------------------------------------------------------------
+    // 8. Output using the same ArduPlane output interface as
+    //    Mode::output_pilot_throttle().
+    // ------------------------------------------------------------
+
+    SRV_Channels::set_output_scaled(
+        SRV_Channel::k_throttle,
+        throttle * 100.0f
+    );
+}
+
+void ModeFBWT::run()
+{
+    // Common fixed-wing attitude/stick-mixing processing
+    Mode::run();
+
+    if (_submode != Submode::Fbwa)  // _submode == Submode::Levelup
+        output_fbwt_throttle_assist();
+    else output_pilot_throttle();
+}

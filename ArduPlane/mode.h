@@ -701,8 +701,8 @@ class ModeFBWT : public Mode {
 public:
     enum class Submode {
         Levelup,
+        Fbwa,
         Headhold,
-        Fbwa
     };
 
     enum FBWTPhase {  // What how and how is it defined?
@@ -720,6 +720,25 @@ public:
         float roll_max;
     };
 
+    struct EnvelopeState {
+        float aoa;              // deg
+        float aoa_limit;        // deg
+        float aoa_margin;       // normalized (0–1)
+
+        float load_factor;      // G
+        float g_limit;          // max allowed
+        float g_margin;         // normalized
+
+        float airspeed;         // m/s
+        float v_min;            // stall buffer speed
+        float v_margin;         // normalized
+
+        float energy_error;     // TECS total energy error
+        float energy_margin;    // normalized
+
+        uint8_t limiter_flags;  // bitmask (AoA, G, Energy, Speed)
+    };
+
     // friend class Plane;
 
     // ModeFBWT(Plane &plane);
@@ -728,12 +747,12 @@ public:
     const char *name() const override { return "FBWT"; }
     const char *name4() const override { return "FBWT"; }
 
-    // bool _enter() override;
+    bool _enter() override;
     void update() override;
     void run() override;
     // void navigate() override;
 
-    bool mode_allows_autotuning() const override { return submode == Submode::Fbwa; }
+    bool mode_allows_autotuning() const override { return _submode == Submode::Fbwa; }
 
 #if AP_PLANE_SYSTEMID_ENABLED
     // does this mode support fixed wing systemid?
@@ -742,22 +761,22 @@ public:
 
 #if MODE_AUTOLAND_ENABLED   
     // true if mode allows landing direction to be set on first takeoff after arm in this mode 
-    bool allows_autoland_direction_capture() const override { return submode != Submode::Levelup; }
+    bool allows_autoland_direction_capture() const override { return _submode != Submode::Levelup; }
 #endif
 
     // Levelup and Headhold are auto-throttle (TECS-driven); Fbwa is manual throttle
-    bool does_auto_throttle() const override { return submode != Submode::Fbwa; }
+    bool does_auto_throttle() const override { return _submode != Submode::Fbwa; }
 
     // Headhold only actively steers via the navigation controller when it
     // actually has a usable position to feed it (see have_position()); if
     // GPS/position is unavailable this evaluates to false and update()
     // instead runs a direct compass-only heading-hold fallback.
-     bool does_auto_navigation() const override { return submode == Submode::Headhold && have_position(); }
+     bool does_auto_navigation() const override { return _submode == Submode::Headhold && have_position(); }
 
      // Don't let stick-mixing fight the bailout/hold controller
-     bool allows_throttle_nudging() const override { return submode == Submode::Headhold; }
+     bool allows_throttle_nudging() const override { return _submode == Submode::Headhold; }
 
-     Submode get_submode() const { return submode; }
+     Submode get_submode() const { return _submode; }
 
     // Update_target_altitude() is deliberately a no-op, like FBWB/CRUISE:
     // the Headhold target altitude is latched once (in run_levelup()) and
@@ -771,6 +790,7 @@ protected:
     // headhold(bool &isDirLocked, bool doPitchLock);  // Execute headhold
 
     bool _enter() override;
+    bool _exit() override;
 private:
     struct EnvelopeLimits {
         float aoa_max;
@@ -780,10 +800,11 @@ private:
         float limiter_floor;
     };
 
-    Submode submode = Submode::Fbwa;
+    Submode _submode = Submode::Fbwa;
+    AP_TECS* _tecs = nullptr;
 
     // Parameters
-    const uint8_t alt_hyst = 10;  // m
+    // const uint8_t alt_hyst = 10;  // m
     AP_Int8 alt_min;  // 30 - 50 m
     // AP_Int8 pitch_min;  // -60, -50 deg; pitch_max ~45 deg
     AP_Int8 pitch_max;
@@ -823,8 +844,6 @@ private:
     // --- Core functions ---
     void update_submode();
     void apply_envelope_limits(float &pitch, float &roll);
-
-
 
     void run_fbwa();
     void run_levelup();
