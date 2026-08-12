@@ -75,6 +75,7 @@ public:
         FLY_BY_WIRE_C = 28,  // ATTENTION: FLTMODE3/4 should be synchronously set to this value to support Flight mode switching from RC
         FLY_BY_WIRE_T = 29,  // ATTENTION: FLTMODEn or respective AUX function's RC switch should be synchronously set to this value to support Flight mode switching from RC
         // Mode number 30 reserved for "offboard" for external/lua control.
+        FLY_BY_WIRE_L = 31,  // ATTENTION: FLTMODEn or respective AUX function's RC switch should be synchronously set to this value to support Flight mode switching from RC
     };
 
     // Constructor
@@ -700,25 +701,25 @@ protected:
 class ModeFBWT : public Mode {
 public:
     enum class Submode {
-        Levelup,
         Fbwa,
-        Headhold,
+        Levelup,
+        // Headhold,
     };
 
-    enum FBWTPhase {  // What how and how is it defined?
-        PHASE_TAKEOFF,
-        PHASE_CLIMB,
-        PHASE_CRUISE,
-        PHASE_MANEUVER,
-        PHASE_DESCENT,
-        PHASE_LANDING
-    };
-
-    struct EnvelopeLimits {
-        float pitch_max;
-        float pitch_min;
-        float roll_max;
-    };
+    // // enum FBWTPhase {  // What how and how is it defined?
+    // //     PHASE_TAKEOFF,
+    // //     PHASE_CLIMB,
+    // //     PHASE_CRUISE,
+    // //     PHASE_MANEUVER,
+    // //     PHASE_DESCENT,
+    // //     PHASE_LANDING
+    // // };
+    // 
+    // // struct EnvelopeLimits {
+    // //     float pitch_max;
+    // //     float pitch_min;
+    // //     float roll_max;
+    // // };
 
     struct EnvelopeState {
         float aoa;              // deg
@@ -747,7 +748,6 @@ public:
     const char *name() const override { return "FBWT"; }
     const char *name4() const override { return "FBWT"; }
 
-    bool _enter() override;
     void update() override;
     void run() override;
     // void navigate() override;
@@ -806,80 +806,113 @@ private:
     // Parameters
     // const uint8_t alt_hyst = 10;  // m
     AP_Int8 alt_min;  // 30 - 50 m
-    // AP_Int8 pitch_min;  // -60, -50 deg; pitch_max ~45 deg
-    AP_Int8 pitch_max;
-    AP_Int8 roll_max;  // 25 .. 45
+    // // AP_Int8 pitch_min;  // -60, -50 deg; pitch_max ~45 deg
+    // AP_Int8 pitch_max;
+    // AP_Int8 roll_max;  // 25 .. 45
     AP_Float ctl_expocrv;  // 0.3f; 0 means disabled
 
-    // AoA limits
-    float alpha_stall = radians(15.0f);
-    float alpha_limit = radians(12.0f);
+    // Protection
+    float estimate_beta() const;
+    void apply_dynamic_stall(float &pitch_cmd, float Nz);
+    void apply_stall_protection(float &pitch_cmd, float airspeed, float Nz);
+    float compute_adaptive_nz_limit(float airspeed);
+    void apply_nz_limit(float &roll_cmd, float airspeed);
+    void apply_energy_roll_limit(float &roll_cmd, float airspeed);
+    void apply_terrain_protection(float &pitch_cmd);
+    void apply_flare_protection(float &pitch_cmd);
+    void apply_energy_limiter(float &pitch_cmd);
+    void apply_turn_coordination(float roll_cmd);
+    float get_envelope_style();
+    void apply_envelope_shaping(float &roll_lim, float &pitch_lim);
 
-    // G-limits
-    float nz_max = 4.0f;
-    float nz_min = -2.0f;
+    bool is_below_alt_min() const;
+    void apply_levelup_protection(float &roll_cmd, float &pitch_cmd);
+    void apply_final_envelope(float &roll_cmd, float &pitch_cmd);
 
-    // Assist gains
-    float assist_gain = 1.0f;
-    float assist_decay = 0.995f;
+    float estimate_aoa() const;
+    float get_fused_aoa() const;
+    void apply_aoa_protection(float &pitch_cmd, float aoa);
+    void apply_aoa_rate_damping(float &pitch_cmd);
+    void apply_aoa_limiter(float &pitch_cmd);
 
-    // State
-    float target_alt = 0;
-    float target_heading = 0;
-    float cur_airspeed = 0;  // Current airspeed
+    float get_energy_factor() const;
+    float compute_recovery_throttle() const;
+
+    void apply_envelope_limits(float &pitch, float &roll);
+    void update_envelope_state(EnvelopeState &env);
+    float get_throttle_assist_gain() const;
+    void output_fbwt_throttle_assist();
+
+    void log_envelope(const EnvelopeState &env) const;
+
+    // // AoA limits
+    // float alpha_stall = radians(15.0f);
+    // float alpha_limit = radians(12.0f);
+
+    // // G-limits
+    // float nz_max = 4.0f;
+    // float nz_min = -2.0f;
+
+    // // Assist gains
+    // float assist_gain = 1.0f;
+    // float assist_decay = 0.995f;
+
+    // // State
+    // float target_alt = 0;
+    // float target_heading = 0;
+    // float cur_airspeed = 0;  // Current airspeed
 
     // // Headhold hold-state, latched by enter_headhold()/run_levelup()
     // int32_t  locked_heading_cd;
     // uint32_t levelup_enter_ms;
-
+    //
     // // Altitude reference used when home was never set (no GPS/position
     // // ever available during this FBWT activation) - see reference_alt_cm().
     // int32_t  no_home_ref_alt_cm;
 
-    // Flags
-    bool has_gps = false;
-    bool has_velocity = false;
-    bool has_airspeed = false;
+    // // Flags
+    // bool has_gps = false;
+    // bool has_velocity = false;
+    // bool has_airspeed = false;
 
-    // --- Core functions ---
-    void update_submode();
-    void apply_envelope_limits(float &pitch, float &roll);
+    // // --- Core functions ---
+    // void update_submode();
 
-    void run_fbwa();
-    void run_levelup();
-    void run_headhold();  // run_headhold_heading_only
-
+    // void run_fbwa();
+    // void run_levelup();
+    // void run_headhold();  // run_headhold_heading_only
+    //
     // void enter_fbwa();
     // void enter_levelup();
     // void enter_headhold();
 
-    // --- Protection ---
-    float compute_alpha();
-    float stall_factor(float alpha);
-    float g_limit_factor(float nz);
-    float energy_factor();
-    void apply_envelope(float &pitch, float &roll);
-    float get_aoa() const;
-    float get_flight_path_angle() const;
+    // // --- Protection ---
+    // float compute_alpha();
+    // float stall_factor(float alpha);
+    // float g_limit_factor(float nz);
+    // float energy_factor();
+    // void apply_envelope(float &pitch, float &roll);
+    // float get_aoa() const;
+    // float get_flight_path_angle() const;
 
-    bool have_position() const;
-    // int32_t reference_alt_cm() const;
-    // bool speed_available(float &eas) const;
-    // bool speed_too_low(float &margin_ms) const;
-    // bool is_stalling() const;
-    // bool pitch_too_low() const;
-    // bool alt_too_low() const;
-    // bool bailout_condition(bool &stalling) const;
+    // bool have_position() const;
+    // // int32_t reference_alt_cm() const;
+    // // bool speed_available(float &eas) const;
+    // // bool speed_too_low(float &margin_ms) const;
+    // // bool is_stalling() const;
+    // // bool pitch_too_low() const;
+    // // bool alt_too_low() const;
+    // // bool bailout_condition(bool &stalling) const;
 
-    // --- Helpers ---
-    FBWTPhase detect_phase() const; 
-    EnvelopeLimits get_phase_limits(FBWTPhase phase) const;
-    float compute_envelope_limiter() const;
-    float get_load_factor() const;
-    float get_energy_rate() const;
-    float compute_energy_limiter() const;
-    float compute_energy_factor() const;
-    float compute_energy() const;
+    // // --- Helpers ---
+    // FBWTPhase detect_phase() const; 
+    // EnvelopeLimits get_phase_limits(FBWTPhase phase) const;
+    // float compute_envelope_limiter() const;
+    // float get_load_factor() const;
+    // float get_energy_rate() const;
+    // float compute_energy_limiter() const;
+    // float compute_energy_factor() const;
+    // float compute_energy() const;
 };
 
 // class ModeFBWT : public Mode
@@ -926,6 +959,106 @@ private:
 //     // AP_Int8 airspd_min;  // 1.2f * stall ~= 16 m/s
 //     // AP_Float ground_pitch;
 // };
+
+//!   ModeFBWL - "Fly By Wire Learning / Assisted".
+//!
+//!   Fbwa submode behaves like ModeFBWA (manual roll/pitch, manual
+//!   throttle) but with continuous, dynamic envelope protection blended
+//!   in: AoA limiter + rate damping, G-limit, stall-speed protection, and
+//!   TECS-integrated energy limiting. Coordinated turn / yaw blending is
+//!   entirely reused from stock ArduPilot (this mode never writes to
+//!   k_rudder). Levelup is a last-resort automatic recovery, engaged only
+//!   if the aircraft leaves the envelope despite those protections; once
+//!   recovered it hands control straight back to Fbwa. All of the above
+//!   degrades gracefully with no GPS and/or no airspeed sensor fitted.
+//!
+//!   See ArduPlane/mode_fbwl.cpp for the full implementation and rationale,
+//!   including the list of stock ArduPlane parameters reused instead of
+//!   new ones.
+class ModeFBWL : public Mode
+{
+public:
+    Number mode_number() const override { return Number::FLY_BY_WIRE_L; }
+    const char *name() const override { return "FBWL"; }
+    const char *name4() const override { return "FBWL"; }
+
+    enum class Submode {
+        Fbwa,       // assisted (continuously protected) manual flight
+        Levelup   // Bailout; Recover
+    };
+
+    void update() override;
+    void run() override;
+
+    bool mode_allows_autotuning() const override { return submode == Submode::Fbwa; }
+    bool does_auto_throttle() const override { return submode != Submode::Fbwa; }
+    bool does_auto_navigation() const override { return false; }
+
+    Submode get_submode() const { return submode; }
+
+#if AP_PLANE_SYSTEMID_ENABLED
+    bool supports_fw_systemid() const override { return submode == Submode::Fbwa; }
+#endif
+
+#if MODE_AUTOLAND_ENABLED
+    bool allows_autoland_direction_capture() const override { return submode == Submode::Fbwa; }
+#endif
+
+    void update_target_altitude() override {}
+
+    static const struct AP_Param::GroupInfo var_info[];
+
+protected:
+    bool _enter() override;
+private:
+    // ---- tunable safety-envelope parameters (see mode_fbwt.cpp for @Param docs) ----
+    AP_Float pitch_min_deg;   // FBWT_PITCH_MIN, deg, default -60
+    AP_Float alt_min_m;       // FBWT_ALT_MIN,   m,   default 30
+    AP_Float alt_hyst_m;      // FBWT_ALT_HYST,  m,   default 10
+    AP_Float aoa_max_deg;     // FBWT_AOA_MAX,   deg, default 12  (new - no stock equivalent)
+    AP_Float load_max;        // FBWT_LOAD_MAX,  G,   default 2.5 (new - no stock equivalent)
+
+    Submode submode;
+
+    uint32_t levelup_enter_ms;
+    int32_t  no_home_ref_alt_cm;
+    mutable bool warned_no_airspeed;
+
+    // AoA rate-damping state
+    mutable float    aoa_prev_deg;
+    mutable uint32_t aoa_prev_us;
+    float aoa_rate_dps_latest;
+
+    // protection-active flags, used by logging + GCS edge-notices
+    bool aoa_limit_active, g_limit_active, stall_speed_limit_active, energy_limit_active;
+    bool prev_aoa_limit_active, prev_g_limit_active, prev_stall_speed_limit_active, prev_energy_limit_active;
+    uint32_t last_log_ms;
+
+    void enter_fbwa();
+    void run_fbwa();
+    void enter_levelup();
+    void run_levelup();
+
+    void apply_aoa_protection();
+    void apply_stall_speed_protection();
+    void apply_g_limit_protection();
+    void apply_energy_limiting();
+    void apply_coordinated_yaw() const;
+    void log_envelope();
+
+    bool have_position() const;
+    int32_t reference_alt_cm() const;
+    float alt_too_low_margin_m() const;
+    bool speed_available(float &eas) const;
+    bool speed_too_low(float &margin_ms) const;
+    float estimate_aoa_deg() const;
+    bool is_stalling() const;
+    bool pitch_too_low() const;
+    bool alt_too_low() const;
+    bool aoa_exceeded_hard() const;
+    bool g_exceeded_hard() const;
+    bool bailout_condition(bool &stalling) const;
+};
 
 class ModeCruise : public Mode
 {

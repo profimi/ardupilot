@@ -303,7 +303,7 @@
 #endif
 
 #ifndef FBWT_AIRSPD_MIN
-    #define FBWT_AIRSPD_MIN  16
+    #define FBWT_AIRSPD_MIN  15
 #endif
 
 #ifndef FBWT_ALT_MIN
@@ -311,7 +311,7 @@
 #endif
 
 #ifndef FBWT_PITCH_MIN
-    #define FBWT_PITCH_MIN  -60
+    #define FBWT_PITCH_MIN  -50  // -40..-60, 30..40
 #endif
 
 #ifndef CTL_EXPOCRV

@@ -179,7 +179,7 @@ static const char* AUX_OPTIONS[] = {
 };
 
 static const char* FLTMODES[] = {
-    "MAN", "CIRC", "STAB", "TRAIN", "ACRO", "FBWA", "FBWB", "FBWC", "FBWT", "CRUISE", "ATUNE", "", "AUTO",
+    "MAN", "CIRC", "STAB", "TRAIN", "ACRO", "FBWA", "FBWB", "FBWC", "FBWT", "FBWL", "CRUISE", "ATUNE", "", "AUTO",
     "RTL", "LOIT", "TKOF", "ADSB", "GUID", "", "QSTAB", "QHOV", "QLOIT", "QLAND",
     "QRTL", "QTUNE", "QACRO", "THRML", "L2QLND"
 };

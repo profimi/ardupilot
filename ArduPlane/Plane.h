@@ -158,6 +158,7 @@ public:
     friend class ModeFBWB;
     friend class ModeFBWC;
     friend class ModeFBWT;
+    friend class ModeFBWL;
     friend class ModeCruise;
     friend class ModeAutoTune;
     friend class ModeAuto;
@@ -310,6 +311,7 @@ private:
     ModeFBWB mode_fbwb;
     ModeFBWC mode_fbwc;
     ModeFBWT mode_fbwt;
+    ModeFBWT mode_fbwl;
     ModeCruise mode_cruise;
     ModeAutoTune mode_autotune;
     ModeAuto mode_auto;

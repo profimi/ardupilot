@@ -223,7 +223,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Bitmask for when to allow negative reverse thrust
     // @Description: This controls when to use reverse thrust. If set to a non-zero value then the bits correspond to flight stages where reverse thrust may be used. The most commonly used value for USE_REV_THRUST is 2, which means AUTO_LAND only. That enables reverse thrust in the landing stage of AUTO mode. Another common choice is 1, which means to use reverse thrust in all auto flight stages. Reverse thrust is always used in MANUAL mode if enabled with THR_MIN < 0. In non-autothrottle controlled modes, if reverse thrust is not used, then THR_MIN is effectively set to 0 for that mode.
     // @Bitmask: 0:AUTO_ALWAYS,1:AUTO_LAND,2:AUTO_LOITER_TO_ALT,3:AUTO_LOITER_ALL,4:AUTO_WAYPOINTS,5:LOITER,6:RTL,7:CIRCLE,8:CRUISE,9:FBWB,10:GUIDED,11:AUTO_LANDING_PATTERN,12:FBWA,13:ACRO,14:STABILIZE,15:THERMAL
-    // Note: ,16:FBWC,17:FBWT are not included explicitly and share FBWV and FBWA respectively to limit the enum with 2 bytes rather than 4 bytes
+    // Note: ,16:FBWC,17:FBWT,18:FBWL are not included explicitly and share FBWV and FBWA respectively to limit the enum with 2 bytes rather than 4 bytes
     // @User: Advanced
     GSCALAR(use_reverse_thrust,     "USE_REV_THRUST",  float(UseReverseThrust::AUTO_LAND_APPROACH)),
 
@@ -476,7 +476,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: FLTMODE1
     // @DisplayName: FlightMode1
     // @Description: Flight mode for switch position 1 (910 to 1230 and above 2049)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,8:AUTOTUNE,10:Auto,11:RTL,12:Loiter,13:TAKEOFF,14:AVOID_ADSB,15:Guided,17:QSTABILIZE,18:QHOVER,19:QLOITER,20:QLAND,21:QRTL,22:QAUTOTUNE,23:QACRO,24:THERMAL,25:Loiter to QLand,26:AUTOLAND,28:FBWC,29:FBWT
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,8:AUTOTUNE,10:Auto,11:RTL,12:Loiter,13:TAKEOFF,14:AVOID_ADSB,15:Guided,17:QSTABILIZE,18:QHOVER,19:QLOITER,20:QLAND,21:QRTL,22:QAUTOTUNE,23:QACRO,24:THERMAL,25:Loiter to QLand,26:AUTOLAND,28:FBWC,29:FBWT,31:FBWL
     // @User: Standard
     GSCALAR(flight_mode1,           "FLTMODE1",       FLIGHT_MODE_1),
 
@@ -1331,6 +1331,12 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Group: FBWT_
     // @Path: mode_fbwt.cpp
     AP_SUBGROUPINFO(mode_fbwt, "FBWT_", 51, ParametersG2, ModeFBWT),
+#endif
+
+#if MODE_FBWL_ENABLED
+    // @Group: FBWL_
+    // @Path: mode_fbwl.cpp
+    AP_SUBGROUPINFO(mode_fbwl, "FBWL_", 52, ParametersG2, ModeFBWL),
 #endif
 
     // Note: run documentation building script to compile it to be shown in Mission planner:

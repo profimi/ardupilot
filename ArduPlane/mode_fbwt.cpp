@@ -78,7 +78,7 @@ static float estimate_load_factor(float roll_deg)
 }
 
 // Sidesleep (beta) estimatio
-float ModeFBWT::estimate_beta()
+float ModeFBWT::estimate_beta() const
 {
     const Vector3f &vel = plane.ahrs.get_velocity_NED();
 
@@ -394,7 +394,7 @@ void ModeFBWT::apply_envelope_shaping(float &roll_lim, float &pitch_lim)
 }
 
 // Levelup trigger
-bool ModeFBWT::is_below_alt_min()
+bool ModeFBWT::is_below_alt_min() const
 {
     int16_t alt = roundf(plane.relative_altitude()); // meters
     Vector3f vel;
@@ -445,7 +445,7 @@ void ModeFBWT::apply_final_envelope(float &roll_cmd, float &pitch_cmd)
 }
 
 // Angle of Attack estimation and protection
-float ModeFBWT::estimate_aoa()
+float ModeFBWT::estimate_aoa() const
 {
     float pitch = degrees(plane.ahrs.pitch);
     float flight_path = degrees(atan2f(
@@ -456,7 +456,7 @@ float ModeFBWT::estimate_aoa()
     return pitch - flight_path;
 }
 
-float ModeFBWT::get_fused_aoa()
+float ModeFBWT::get_fused_aoa() const
 {
     float aoa_est = estimate_aoa();
 
@@ -681,7 +681,7 @@ void ModeFBWT::update()
     }
 }
 
-void ModeFBWT::log_envelope(const EnvelopeState &env)
+void ModeFBWT::log_envelope(const EnvelopeState &env) const
 {
     AP::logger().Write("ENVP",
         "TimeUS,AoA,AoALim,AoAMargin,G,GLim,GMargin,V,Vmin,VMargin,Eerr,Emargin,Flags",
@@ -1848,85 +1848,6 @@ float ModeFBWT::compute_recovery_throttle() const
     );
 }
 
-float ModeFBWT::compute_recovery_throttle() const
-{
-    /*
-     * Start at the aircraft's normal cruise throttle and
-     * increase toward THR_MAX according to energy deficit.
-     */
-
-    float cruise =
-        constrain_float(
-            plane.aparm.throttle_cruise * 0.01f,
-            0.0f,
-            1.0f
-        );
-
-    float maximum =
-        constrain_float(
-            plane.aparm.throttle_max * 0.01f,
-            0.0f,
-            1.0f
-        );
-
-
-    if (maximum < cruise) {
-        maximum = cruise;
-    }
-
-
-    // ------------------------------------------------------------
-    // Energy state
-    // ------------------------------------------------------------
-
-    const float energy_factor =
-        constrain_float(
-            get_energy_factor(),
-            0.0f,
-            1.0f
-        );
-
-    const float deficit =
-        1.0f - energy_factor;
-
-
-    // ------------------------------------------------------------
-    // Cruise -> maximum throttle.
-    // ------------------------------------------------------------
-
-    float recovery =
-        cruise +
-        deficit * (maximum - cruise);
-
-
-    // ------------------------------------------------------------
-    // Severe stall condition:
-    //
-    // Don't reduce throttle below cruise, but don't use AoA
-    // itself as a reason to blindly command maximum throttle.
-    // The AoA limiter is responsible for unloading the aircraft.
-    // ------------------------------------------------------------
-
-    const float aoa = get_fused_aoa();
-
-    if (isfinite(aoa) &&
-        aoa > _aoa_limit_deg) {
-
-        recovery =
-            MAX(
-                recovery,
-                cruise
-            );
-    }
-
-
-    return constrain_float(
-        recovery,
-        cruise,
-        maximum
-    );
-}
-
 float ModeFBWT::get_throttle_assist_gain() const
 {
     if (_submode != FBWT_SUBMODE_LEVELUP) {
@@ -2001,7 +1922,7 @@ float ModeFBWT::get_throttle_assist_gain() const
     return demand;
 }
 
-void ModeFBWT::output_fbwt_throttle_assist()
+void ModeFBWT::output_fbwt_throttle_assist() const
 {
     /*
      * FBWT LEVELUP throttle assistance.

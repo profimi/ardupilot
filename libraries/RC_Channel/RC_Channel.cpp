@@ -276,7 +276,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Values{Copter}: 219:Transmitter Tuning
     // @Values{Plane}: 240:Kill Throttle LR
     // @Values{Plane}: 241:RF (TX & VTX) power swich relay control in specific operating modes for various vehicles
-    // @Values{Plane}: 250:FBWB, 251:FBWC, 252:FBWT
+    // @Values{Plane}: 250:FBWB, 251:FBWC, 252:FBWT, 253:FBWL
     // @Values{All-Vehicles}: 300:Scripting1, 301:Scripting2, 302:Scripting3, 303:Scripting4, 304:Scripting5, 305:Scripting6, 306:Scripting7, 307:Scripting8, 308:Scripting9, 309:Scripting10, 310:Scripting11, 311:Scripting12, 312:Scripting13, 313:Scripting14, 314:Scripting15, 315:Scripting16
     // @Values{All-Vehicles}: 316:Stop-Restart Scripting
     // @User: Standard

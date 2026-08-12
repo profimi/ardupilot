@@ -153,6 +153,7 @@ void RC_Channel_Plane::init_aux_function(const RC_Channel::AUX_FUNC ch_option,
     case AUX_FUNC::FBWB:
     case AUX_FUNC::FBWC:
     case AUX_FUNC::FBWT:
+    case AUX_FUNC::FBWL:
     case AUX_FUNC::AIRBRAKE:
 #if HAL_QUADPLANE_ENABLED
     case AUX_FUNC::QRTL:
@@ -289,6 +290,10 @@ bool RC_Channel_Plane::do_aux_function(const AuxFuncTrigger &trigger)
 
     case AUX_FUNC::FBWT:
         do_aux_function_change_mode(Mode::Number::FLY_BY_WIRE_T, ch_flag);
+        break;
+
+    case AUX_FUNC::FBWL:
+        do_aux_function_change_mode(Mode::Number::FLY_BY_WIRE_L, ch_flag);
         break;
 
 #if HAL_QUADPLANE_ENABLED

@@ -426,6 +426,7 @@ public:
         FBWB =                250, // Fly-By-Wire-B
         FBWC =                251, // Fly-By-Wire-C
         FBWT =                252, // Fly-By-Wire-T Training mode
+        FBWL =                253, // Fly-By-Wire-L Learning mode
 
 #if AP_SCRIPTING_ENABLED
         // inputs for the use of onboard lua scripting
