@@ -21,6 +21,8 @@ const struct AP_Param::GroupInfo ModeFBWT::var_info[] = {
     // @Increment: 1
     AP_GROUPINFO("ALT_MIN", 1, ModeFBWT, alt_min, FBWT_ALT_MIN),
 
+    // ASCALAR(g_limit, "LIM_G_DEG", LIM_G_DEFAULT), // Linked directly under the aparm macro definitions
+    
     // // @Param: AIRSPD_MIN
     // // @DisplayName: FBWT Minimal airspeed
     // // @Description: Minimum airspeed for the regular Submode::Fbwa, otherwise Submode::Headhold is activated 
@@ -53,6 +55,8 @@ const struct AP_Param::GroupInfo ModeFBWT::var_info[] = {
     AP_GROUPEND
 };
 
+constexpr float _aoa_limit_deg = 12.0f;
+
 
 // Helpers
 static float constrain_symmetric(float val, float limit)
@@ -80,13 +84,15 @@ static float estimate_load_factor(float roll_deg)
 // Sidesleep (beta) estimatio
 float ModeFBWT::estimate_beta() const
 {
-    const Vector3f &vel = plane.ahrs.get_velocity_NED();
-
-    if (!plane.ahrs.airspeed_sensor_enabled()) {
+    if (!ahrs.airspeed_sensor_enabled()) {
         return 0.0f; // fallback
     }
+    Vector3f vel;
+    if(!ahrs.get_velocity_NED(vel))
+        vel.zero();
 
-    float airspeed = plane.airspeed_estimate();
+    float airspeed;
+    ahrs.airspeed_EAS(airspeed);
 
     if (airspeed < 5.0f)
         return 0.0f;
@@ -176,7 +182,7 @@ void ModeFBWT::apply_nz_limit(float &roll_cmd, float airspeed)
 //     // AP_TECS *_tecs = plane._tecs;
 //     if (!_tecs) return;
 
-//     float STEdot = _tecs->get_SPDot();
+//     float STEdot = _tecs->get_VXdot(); 
 
 //     if (STEdot < -3.0f) {
 //         float scale = constrain_float((STEdot + 5.0f) / 2.0f, 0.3f, 1.0f);
@@ -187,7 +193,7 @@ void ModeFBWT::apply_nz_limit(float &roll_cmd, float airspeed)
 // Both airspeed, load factor, and Energy-aware (TECS) roll limiting
 void ModeFBWT::apply_energy_roll_limit(float &roll_cmd, float airspeed)
 {
-    float roll_limit = plane.aparm.roll_limit_cd * 0.01f;
+    float roll_limit = plane.aparm.roll_limit;
 
     // --------------------------------------------------
     // 1. AIRSPEED-BASED LIMIT (PRIMARY SAFETY)
@@ -225,12 +231,22 @@ void ModeFBWT::apply_energy_roll_limit(float &roll_cmd, float airspeed)
     // --------------------------------------------------
     float tecs_factor = 1.0f;
 
-    if (plane.tecs_controller != nullptr) {
-        float energy_error = plane.tecs_controller->get_energy_error();
+    // float energy_error = _tecs->get_STE_error();
+    // Calculate altitude error (Potential Energy component)
+    // float alt_error = _tecs->get_target_altitude() - plane.current_loc.alt * 0.01f;
+    // float alt_error = (plane.nav_altitude_cm * 0.01f) - plane.current_loc.alt * 0.01f;
+    // Extract the master AMSL target height from the target_altitude tracker block
+    float alt_error = (plane.target_altitude.amsl_cm * 0.01f) - (plane.current_loc.alt * 0.01f);
 
-        if (energy_error < 0.0f) {
-            tecs_factor = constrain_float(1.0f + energy_error * 0.3f, 0.5f, 1.0f);
-        }
+    // Calculate airspeed error (Kinetic Energy component)
+    float airspeed_error = _tecs->get_target_airspeed() - plane.airspeed.get_airspeed();
+
+    // Combine them into a Total Specific Energy Error (Standard Total Energy Error formulation)
+    // Total Energy = Potential Energy (height * gravity) + Kinetic Energy (0.5 * velocity^2)
+    float energy_error = (alt_error * 9.81f) + (0.5f * (airspeed_error * airspeed_error));
+
+    if (energy_error < 0.0f) {
+        tecs_factor = constrain_float(1.0f + energy_error * 0.3f, 0.5f, 1.0f);
     }
 
     float roll_lim_tecs = roll_limit * tecs_factor;
@@ -264,7 +280,7 @@ void ModeFBWT::apply_terrain_protection(float &pitch_cmd)
 // Near-ground pitch angle control protection
 void ModeFBWT::apply_flare_protection(float &pitch_cmd)
 {
-    float height = plane.relative_ground_altitude(true);
+    float height = plane.relative_ground_altitude(RangeFinderUse::TAKEOFF_LANDING);  // Or use RangeFinderUse::NONE
 
     const float flare_start = 10.0f; // meters
     const float flare_end   = 2.0f;
@@ -296,7 +312,7 @@ void ModeFBWT::apply_energy_limiter(float &pitch_cmd)
     if (!_tecs)
         return;
 
-    float STEdot = _tecs->get_SPDot();
+    float STEdot = _tecs->get_VXdot();
 
     const float sink_limit = -5.0f;  // m/s
     const float climb_limit = 5.0f;  // TODO: Load from Arduplane params
@@ -321,7 +337,8 @@ void ModeFBWT::apply_turn_coordination(float roll_cmd)
     float rudder_in = plane.channel_rudder->norm_input();
 
     // Get airspeed (fallback-safe)
-    float airspeed = plane.airspeed_estimate();
+    float airspeed = 0;
+    ahrs.airspeed_EAS(airspeed);
     if (airspeed < 5.0f)
         return;
 
@@ -351,7 +368,7 @@ void ModeFBWT::apply_turn_coordination(float roll_cmd)
     float final_rudder = blend * rudder_cmd + (1.0f - blend) * rudder_in;
 
     // Send to controller
-    plane.channel_rudder->set_servo_out(final_rudder * 4500); // centidegrees scale
+    SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, final_rudder * 4500);  // centidegrees scale
 }
 
 // Envelope Style factor (trainer .. aggressive)
@@ -359,8 +376,8 @@ float ModeFBWT::get_envelope_style()
 {
     // Use existing tuning to infer "aggressiveness"
 
-    float roll_max = plane.aparm.roll_limit_cd * 0.01f; // deg
-    float pitch_max = plane.aparm.pitch_limit_max_deg;
+    float roll_max = plane.aparm.roll_limit; // deg
+    float pitch_max = plane.aparm.pitch_limit_max;
 
     // Normalize (trainer → aggressive)
     float roll_factor  = constrain_float(roll_max / 60.0f, 0.5f, 1.5f);
@@ -396,11 +413,12 @@ void ModeFBWT::apply_envelope_shaping(float &roll_lim, float &pitch_lim)
 // Levelup trigger
 bool ModeFBWT::is_below_alt_min() const
 {
-    int16_t alt = roundf(plane.relative_altitude()); // meters
-    Vector3f vel;
+    int16_t alt = roundf(plane.relative_altitude);  // meters
+    float vel_down;
     float sink_rate = 0;
-    if (ahrs.get_velocity_NED(vel))
-        sink_rate = vel.z;
+    const AP_GPS &gps = AP::gps();
+    if (ahrs.get_velocity_D(vel_down))
+        sink_rate = vel_down;
     else if (gps.status() >= AP_GPS::GPS_OK_FIX_3D && gps.have_vertical_velocity())
         sink_rate = gps.velocity().z;
     else sink_rate = -plane.barometer.get_climb_rate();
@@ -417,7 +435,7 @@ void ModeFBWT::apply_levelup_protection(float &roll_cmd, float &pitch_cmd)
     roll_cmd = blend_limits(roll_cmd, 0.0f, 0.2f);
 
     // Force safe pitch-up (but not extreme)
-    float pitch_target = MIN(10.0f, plane.aparm.pitch_limit_max_deg);
+    float pitch_target = MIN(10.0f, plane.aparm.pitch_limit_max);
 
     pitch_cmd = blend_limits(pitch_cmd, pitch_target, 0.1f);
 
@@ -428,8 +446,8 @@ void ModeFBWT::apply_levelup_protection(float &roll_cmd, float &pitch_cmd)
 
 void ModeFBWT::apply_final_envelope(float &roll_cmd, float &pitch_cmd)
 {
-    float roll_lim  = plane.aparm.roll_limit_cd * 0.01f;
-    float pitch_lim = plane.aparm.pitch_limit_max_deg;
+    float roll_lim  = plane.aparm.roll_limit;
+    float pitch_lim = plane.aparm.pitch_limit_max;
 
     // 1) Envelope shaping (trainer/aggressive)
     apply_envelope_shaping(roll_lim, pitch_lim);
@@ -447,11 +465,16 @@ void ModeFBWT::apply_final_envelope(float &roll_cmd, float &pitch_cmd)
 // Angle of Attack estimation and protection
 float ModeFBWT::estimate_aoa() const
 {
-    float pitch = degrees(plane.ahrs.pitch);
-    float flight_path = degrees(atan2f(
-        -plane.ahrs.get_velocity_NED().z,
-        plane.airspeed_estimate()
-    ));
+    float flight_path = 0;
+    {
+        float vel_down;
+        if(ahrs.get_velocity_D(vel_down)) {
+            float airspeed;
+            ahrs.airspeed_EAS(airspeed);
+            flight_path = degrees(atan2f(-vel_down, airspeed));
+        }
+    }
+    float pitch = ahrs.get_pitch_deg();
 
     return pitch - flight_path;
 }
@@ -460,18 +483,18 @@ float ModeFBWT::get_fused_aoa() const
 {
     float aoa_est = estimate_aoa();
 
-    if (!plane.ahrs.aoa_sensor_enabled()) {
+    if (!plane.airspeed.use()) {
         return aoa_est;
     }
 
-    float aoa_meas = plane.ahrs.get_aoa();
+    float aoa_meas = plane.ahrs.getAOA(); 
 
     // confidence weighting
     float w = 0.7f; // trust sensor more near stall
 
     // optional: reduce trust at high noise / low speed
-    float airspeed = plane.airspeed_estimate();
-    if (airspeed < plane.aparm.airspeed_min * 1.2f) {
+    float airspeed;
+    if (ahrs.airspeed_EAS(airspeed) && airspeed < plane.aparm.airspeed_min * 1.2f) {
         w = 0.9f;
     }
 
@@ -480,7 +503,7 @@ float ModeFBWT::get_fused_aoa() const
 
 void ModeFBWT::apply_aoa_protection(float &pitch_cmd, float aoa)
 {
-    const float aoa_limit = 12.0f; // conservative
+    const float aoa_limit = _aoa_limit_deg; // conservative
 
     if (aoa > aoa_limit && pitch_cmd > 0) {
         float scale = aoa_limit / aoa;
@@ -545,7 +568,8 @@ void ModeFBWT::apply_aoa_limiter(float &pitch_cmd)
 // Combined envelope limiter
 void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
 {
-    float airspeed = plane.airspeed_estimate();
+    float airspeed;
+    ahrs.airspeed_EAS(airspeed);
     float Nz = estimate_load_factor(roll_cmd);
 
     // Load protection
@@ -574,15 +598,15 @@ void ModeFBWT::apply_envelope_limits(float &roll_cmd, float &pitch_cmd)
     apply_final_envelope(roll_cmd, pitch_cmd);
 
     EnvelopeState est;
-    update_envelope_state(est)
+    update_envelope_state(est);
     log_envelope(est);
 }
 
 void ModeFBWT::update_envelope_state(EnvelopeState &env)
 {
     // --- AoA ---
-    env.aoa = sensors.aoa_deg;
-    env.aoa_limit = aoa_protection_limit_deg;
+    env.aoa = degrees(plane.ahrs.getAOA());
+    env.aoa_limit = 12;  // aoa_protection_limit_deg;  // TODO: Might define the respective parameter
 
     env.aoa_margin = constrain_float(
         (env.aoa_limit - env.aoa) / env.aoa_limit,
@@ -590,8 +614,13 @@ void ModeFBWT::update_envelope_state(EnvelopeState &env)
     );
 
     // --- G-load ---
-    env.load_factor = sensors.nz;
-    env.g_limit = g_limit_max;
+    // Fetches the real-time G-force vector along the aircraft's body axes
+    Vector3f accel_eff = plane.ahrs.get_accel_ef();
+    // The z-component contains the vertical G-loading (divided by gravity)
+    // Note: Ardupilot conventions mean this is negative under positive Gs, 
+    // so take the absolute value or negate it depending on your context.
+    env.load_factor = fabsf(accel_eff.z) / GRAVITY_MSS;
+    env.g_limit = 2.5f;  // plane.aparm.g_limit;;  // g_limit_max;  // TODO: Might define the respective parameter
 
     env.g_margin = constrain_float(
         (env.g_limit - env.load_factor) / env.g_limit,
@@ -599,8 +628,15 @@ void ModeFBWT::update_envelope_state(EnvelopeState &env)
     );
 
     // --- Airspeed ---
-    env.airspeed = sensors.airspeed;
-    env.v_min = airspeed_min_safe;
+    if (plane.airspeed.use()) {
+        // Synthetic Fallback path: Use when sensor is absent, disabled, or failed
+        // This extracts the EKF's groundspeed-minus-wind mathematical estimation
+        if (!plane.ahrs.airspeed_EAS(env.airspeed)) {
+            // Absolute worst-case scenario backup if EKF estimate is uninitialized
+            env.airspeed = plane.ahrs.groundspeed();
+        }
+    } else env.airspeed = plane.airspeed.get_airspeed();
+    env.v_min = plane.aparm.airspeed_min;  // m/s
 
     env.v_margin = constrain_float(
         (env.airspeed - env.v_min) / env.v_min,
@@ -608,10 +644,38 @@ void ModeFBWT::update_envelope_state(EnvelopeState &env)
     );
 
     // --- Energy (TECS) ---
-    float e_total = _tecs.get_total_energy();
-    float e_target = _tecs.get_target_energy();
+    // 1. Calculate Actual Specific Total Energy (STE = SPE + SKE)
+    // SPE (Potential) = Height * Gravity
+    // SKE (Kinetic) = 0.5 * True Airspeed squared
+    float actual_height = plane.current_loc.alt * 0.01f;
+    // True Airspeed calculation fallback
+    float actual_tas = 0.0f;
+    if (plane.airspeed.use()) {
+        // Use the physical pitot sensor converted to True Airspeed
+        actual_tas = plane.airspeed.get_airspeed() * plane.ahrs.get_EAS2TAS();
+    } else if (!plane.ahrs.airspeed_TAS(actual_tas)) {
+        // Fallback if the sensor is disabled and EKF wind tracking is uninitialized
+        actual_tas = plane.ahrs.groundspeed(); 
+    }
+    float e_total = (actual_height * GRAVITY_MSS) + (0.5f * actual_tas * actual_tas);
+
+    // 2. Calculate Target Specific Total Energy Demand
+    float target_height = plane.target_altitude.amsl_cm * 0.01f;
+    float target_tas = _tecs->get_target_airspeed() * plane.ahrs.get_EAS2TAS(); // Convert target EAS to TAS
+    float e_target = (target_height * GRAVITY_MSS) + (0.5f * target_tas * target_tas);
 
     env.energy_error = e_target - e_total;
+    // Calculate an aircraft-specific dynamic maximum variance bounds
+    float min_safe_speed = plane.aparm.airspeed_min;
+    float max_maneuver_g = env.g_limit;  // plane.aparm.g_limit;
+
+    // Combine worst-case speed dropping to zero + high-G maneuver energy shedding estimation
+    float energy_error_max = (0.5f * min_safe_speed * min_safe_speed) + (max_maneuver_g * GRAVITY_MSS * 10.0f);
+
+    // Ensure it never causes a divide-by-zero compile trap or run-time freeze
+    if (energy_error_max < 1.0f) {
+        energy_error_max = 200.0f;
+    }
 
     env.energy_margin = constrain_float(
         1.0f - fabsf(env.energy_error) / energy_error_max,
@@ -630,32 +694,35 @@ void ModeFBWT::update_envelope_state(EnvelopeState &env)
 // Main function
 void ModeFBWT::update()
 {
-    float pitch_in = plane.channel_pitch->norm_input();
+    float pitch_in = plane.channel_pitch->norm_input();  // -1..1
     float roll_in  = plane.channel_roll->norm_input();
+    // Stick shaping (more natural feel)
+    if(ctl_expocrv > 0) {
+        pitch_in = expo_curve(pitch_in, ctl_expocrv);
+        roll_in = expo_curve(pitch_in, ctl_expocrv);
+    }
 
     float pitch_max = plane.aparm.pitch_limit_max;
     float pitch_min = plane.aparm.pitch_limit_min;
-    float roll_max  = plane.aparm.roll_limit_cd * 0.01f;
+    float roll_max  = plane.aparm.roll_limit;
 
     float pitch_cmd = pitch_in * (pitch_in > 0 ? pitch_max : -pitch_min);
     float roll_cmd  = roll_in  * roll_max;
 
     switch (_submode) {
-
-    case FBWT_SUBMODE_FBWA:
-        break;
-
-    case FBWT_SUBMODE_HEADHOLD:
-        if (fabsf(roll_in) < 0.05f) {
-            roll_cmd = plane.nav_roll_cd * 0.01f;
-        }
-        break;
-
-    case FBWT_SUBMODE_LEVELUP:
+    case Submode::Levelup:
         if (pitch_in > 0.8f) {
             pitch_cmd = pitch_max;
             roll_cmd = blend_limits(roll_cmd, 0.0f, 0.2f);
         }
+        break;
+    // case Submode::Headhold:
+    //     if (fabsf(roll_in) < 0.05f) {
+    //         roll_cmd = plane.nav_roll_cd * 0.01f;
+    //     }
+    //     break;
+    case Submode::Fbwa:
+    default:
         break;
     }
 
@@ -665,6 +732,8 @@ void ModeFBWT::update()
     plane.nav_roll_cd  = roll_cmd  * 100.0f;
 
     if (plane.g.log_bitmask & MASK_LOG_ATTITUDE_FAST) {
+        float airspeed;
+        ahrs.airspeed_EAS(airspeed);
         AP::logger().Write(
             "FBWT",
             "TimeUS,Rin,Pin,Rcmd,Pcmd,Nz,Spd,Beta",
@@ -675,7 +744,7 @@ void ModeFBWT::update()
             roll_cmd,
             pitch_cmd,
             estimate_load_factor(roll_cmd),
-            plane.airspeed_estimate(),
+            airspeed,
             estimate_beta()
         );
     }
@@ -716,7 +785,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 //     }
     
 //     // --- 5. Convert pilot input → demanded angles
-//     const float pitch_max = plane.aparm.pitch_limit_max_deg;
+//     const float pitch_max = plane.aparm.pitch_limit_max;
 //     // const float pitch_min = plane.aparm.pitch_limit_min_deg;
 //     const float roll_max  = plane.aparm.roll_limit_deg;
 //     float pitch_cmd = pitch_in * pitch_max;
@@ -735,7 +804,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // void ModeFBWT::apply_envelope_limits(float &pitch_cmd, float &roll_cmd)
 // {
 //     // --- 2. Get configured limits (degrees)
-//     const float pitch_max = plane.aparm.pitch_limit_max_deg;
+//     const float pitch_max = plane.aparm.pitch_limit_max;
 //     const float pitch_min = plane.aparm.pitch_limit_min_deg;
 //     const float roll_max  = plane.aparm.roll_limit_deg;
 
@@ -770,7 +839,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 
 // FBWTPhase ModeFBWT::detect_phase() const
 // {
-//     float pitch = ahrs.pitch;
+//     float pitch = ahrs.get_pitch_rad();
 //     float vz    = get_vertical_speed();   // baro or derived
 //     float thr   = SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
 //     float load  = get_load_factor();
@@ -1084,15 +1153,18 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // //     return get_aoa();
 // //     // fallback estimate
 // //     float vz = 0;
-// //     if(plane.ahrs.have_velocity())
-// //         vz = -ahrs.get_velocity_NED().z;
-// //     return plane.ahrs.pitch - atan2f(vz, cur_airspeed);
+// //     if(plane.ahrs.have_velocity()) {
+// //         float vel_down;
+// //         ahrs.get_velocity_D(vel_down);
+// //         vz = -vel_down;
+// //     }
+// //     return ahrs.get_pitch_rad() - atan2f(vz, cur_airspeed);
 // // }
 
 // // float ModeFBWT::get_aoa() const
 // // {
 // //     // Fallback: synthetic AoA approximation
-// //     float pitch = degrees(plane.ahrs.pitch);
+// //     float pitch = ahrs.get_pitch_deg();
 // //     float flight_path_angle = get_flight_path_angle();
 
 // //     return pitch - flight_path_angle;
@@ -1101,7 +1173,9 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // // float ModeFBWT::get_flight_path_angle() const
 // // {
 // //     if (plane.ahrs.have_velocity()) {
-// //         Vector3f vel = plane.ahrs.get_velocity_NED();
+// //         Vector3f vel;
+// //         if(!ahrs.get_velocity_NED(vel))
+// //           return 0;
 // //         float horizontal_speed = sqrtf(sq(vel.x) + sq(vel.y));
 
 // //         if (horizontal_speed > 1.0f)
@@ -1165,7 +1239,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // bool ModeFBWT::have_position() const
 // {
 //     Location loc;
-//     return plane.ahrs.get_position(loc);
+//     return plane.ahrs.get_location(loc);
 // }
 
 // float ModeFBWT::get_load_factor() const
@@ -1201,32 +1275,28 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 //     return 0.5f; // fallback
 // }
 
-// // Fast, Energy rate, noisy
-// float ModeFBWT::energy_factor()
-// {
-//     float e_rate = get_energy_rate();
-
-//     if (e_rate > -0.5f) return 1.0f;
-
-//     return constrain_float(1.0f + e_rate, 0.3f, 1.0f);
-// }
-
-// // // float ModeFBWT::get_energy_rate()
+// // // float ModeFBWT::energy_rate()
 // // // {
 // // //     float vz = 0;
-// // //     if(plane.ahrs.have_velocity())
-// // //         vz = -ahrs.get_velocity_NED().z;
+// // //     if(plane.ahrs.have_velocity()) {
+// // //        float vel_down;
+// // //        ahrs.get_velocity_D(vel_down);
+// // //        vz = -vel_down;
+// // //     }
 // // //     float v  = cur_airspeed;
 // // //
 // // //     return vz + (v * plane.airspeed_rate) / GRAVITY_MSS;
 // // // }
 
-// // float ModeFBWT::get_energy_rate()
+// // float ModeFBWT::energy_rate()
 // // {
 // //     // --- 1. Vertical speed (positive up)
 // //     float vz = 0.0f;
-// //     if (has_velocity)
-// //         vz = -ahrs.get_velocity_NED().z;
+// //     if (has_velocity) {
+// //         float vel_down;
+// //         ahrs.get_velocity_D(vel_down);
+// //         vz = -vel_down;
+// //     }
 
 // //     // --- 2. Airspeed estimate
 // //     float v = cur_airspeed;  // get_airspeed_estimate();
@@ -1256,43 +1326,43 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // //     return vz + (v * dv_filtered) / GRAVITY_MSS;
 // // }
 
-// float ModeFBWT::get_energy_rate()
-// {
-//     // --- 1. Vertical speed (m/s, positive up)
-//     float vz = 0.0f;
+float ModeFBWT::energy_rate() const
+{
+    // --- 1. Vertical speed (m/s, positive up)
+    float vz = 0.0f;
 
-//     if (plane.ahrs.have_velocity()) {
-//         const Vector3f &vel = plane.ahrs.get_velocity_NED();
-//         vz = -vel.z;  // NED frame: down is positive
-//     }
+    float vel_down;
+    if (plane.ahrs.get_velocity_D(vel_down)) {
+        vz = -vel_down;  // Negate to get positive vertical climb rate (vz)
+    }
 
-//     // --- 2. Speed estimate (m/s)
-//     float v = cur_airspeed;
+    // --- 2. Speed estimate (m/s)
+    float v = plane.airspeed.get_airspeed();  // cur_airspeed;
 
-//     // --- 3. Forward acceleration (body X axis)
-//     float ax = 0.0f;
+    // --- 3. Forward acceleration (body X axis)
+    float ax = 0.0f;
 
-//     const AP_InertialSensor &ins = AP::ins();
-//     if (ins.get_accel_count() > 0)
-//         ax = ins.get_accel(0).x;  // body-frame forward accel
+    const AP_InertialSensor &ins = AP::ins();
+    if (ins.get_accel_count() > 0)
+        ax = ins.get_accel(0).x;  // body-frame forward accel
 
-//     // --- 4. Energy rate
-//     // return vz + (v * ax) / GRAVITY_MSS;
+    // --- 4. Energy rate
+    // return vz + (v * ax) / GRAVITY_MSS;
 
-//     static float ax_filt = 0.0f;
-//     const float alpha = 0.2f;
+    static float ax_filt = 0.0f;
+    const float alpha = 0.2f;
 
-//     ax_filt = alpha * ax + (1.0f - alpha) * ax_filt;
+    ax_filt = alpha * ax + (1.0f - alpha) * ax_filt;
 
-//     return vz + (v * ax_filt) / GRAVITY_MSS;
-// }
+    return vz + (v * ax_filt) / GRAVITY_MSS;
+}
 
-// float ModeFBWT::get_energy_rate() {
+// float ModeFBWT::energy_rate() {
 //     float ax = ahrs.get_accel_body().x;
 //     return vz + (v * ax) / GRAVITY_MSS;
 // }
 
-// // float ModeFBWT::get_energy_rate()
+// // float ModeFBWT::energy_rate()
 // // {
 // //     return plane.TECS.get_SPE_rate() +
 // //            plane.TECS.get_SKE_rate();
@@ -1365,7 +1435,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // //         isDirLocked = false;
 
 // //         // set nav_roll and nav_pitch using sticks
-// //         plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit_cd;
+// //         plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit * 100;
 // //         plane.update_load_factor();
 // //         float pitch_input = plane.channel_pitch->norm_input();
 // //         if (pitch_input > 0) {
@@ -1439,7 +1509,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 //     }
 
 //     // TECS altitude hold
-//     plane.tecs_controller->update_pitch_throttle(
+//     _tecs->update_pitch_throttle(
 //         target_alt,
 //         cur_airspeed,
 //         plane.groundspeed()
@@ -1504,7 +1574,7 @@ void ModeFBWT::log_envelope(const EnvelopeState &env) const
 // //     // plane.update_load_factor();  // It is likely already called by the main loop, and this one is not strictly necessary
 // //     plane.nav_controller->update_heading_hold(locked_yaw_cd);
 // //     // Pull the resulting 'nav_roll' calculated by the controller and limits to ensure the plane doesn't bank too steeply
-// //     plane.nav_roll_cd = constrain_int32(plane.nav_controller->nav_roll_cd(), -plane.roll_limit_cd, plane.roll_limit_cd);
+// //     plane.nav_roll_cd = constrain_int32(plane.nav_controller->nav_roll_cd(), -plane.roll_limit*100, plane.roll_limit*100);
 // //     plane.nav_pitch_cd = locked_pitch_cd;
 
 // //     // Note: Throttle locking is performed in Plane::set_throttle(void), otherwise the value is set there anyway overwriting the current one
@@ -1535,15 +1605,15 @@ bool ModeFBWT::_enter()
     _submode = Submode::Fbwa;
     // isDirLocked = false;
 
-    // Reset FBWT state.
-    _aoa_fused = 0.0f;
-    _aoa_rate = 0.0f;
-    _prev_aoa = 0.0f;
-
-    _pitch_cmd_prev = 0.0f;
-    _roll_cmd_prev = 0.0f;
-
-    _active_limiters = 0;
+    // // Reset FBWT state.
+    // _aoa_fused = 0.0f;
+    // _aoa_rate = 0.0f;
+    // _prev_aoa = 0.0f;
+    //
+    // _pitch_cmd_prev = 0.0f;
+    // _roll_cmd_prev = 0.0f;
+    //
+    // _active_limiters = 0;
 
     return true;
 }
@@ -1552,7 +1622,7 @@ void ModeFBWT::_exit()
 {
     _tecs = nullptr;
 
-    _active_limiters = 0;
+    // _active_limiters = 0;
 }
 
 // // void ModeFBWT::update()
@@ -1579,7 +1649,7 @@ void ModeFBWT::_exit()
 // //     //     //  if(airspd < airspd_min && pitch > threshold)
 // //     //     //      isStall = true;
 // //     // } else if(AP::gps().status() >= AP_GPS::GPS_OK_FIX_2D && AP::ahrs().groundspeed()) {
-// //     //     ahrs().airspeed_estimate(airspeed)
+// //     //     ahrs().airspeed_EAS(airspeed)
 // //     //     // airspeed_EAS();
 // //     //     airspeed_TAS();
 // //     // }
@@ -1604,7 +1674,7 @@ void ModeFBWT::_exit()
 // //     //      if(airspeed_ms < AS_<MIN && pitch > threshold)
 // //     //          isStall = true;
 // //     // }
-// //     // AP::ahrs().airspeed_estimate(&estimated_airspeed)
+// //     // AP::ahrs().airspeed_EAS(&estimated_airspeed)
 
 
 // //     // Fetch the current pitch from AHRS (returned in radians)
@@ -1653,7 +1723,7 @@ void ModeFBWT::_exit()
 // //         isDirLocked = false;
 
 // //         // set nav_roll and nav_pitch using sticks
-// //         plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit_cd;
+// //         plane.nav_roll_cd  = plane.channel_roll->norm_input() * plane.roll_limit * 100;
 // //         plane.update_load_factor();
 // //         float pitch_input = plane.channel_pitch->norm_input();
 // //         if (pitch_input > 0) {
@@ -1704,7 +1774,7 @@ void ModeFBWT::_exit()
 //         return 0.0f;
 // 
 //     float aoa = get_fused_aoa();
-//     float energy = get_energy_factor();
+//     float energy = energy_factor();
 // 
 //     float aoa_need =
 //         constrain_float(
@@ -1739,9 +1809,19 @@ void ModeFBWT::_exit()
 //     plane.set_servos_manual_passthrough(); // NOT necessarily appropriate
 // }
 
-float ModeFBWT::get_energy_factor() const
+// // Fast, Energy rate, noisy
+// float ModeFBWT::energy_factor() const
+// {
+//     float e_rate = energy_rate();
+//
+//     if (e_rate > -0.5f) return 1.0f;
+//
+//     return constrain_float(1.0f + e_rate, 0.3f, 1.0f);
+// }
+
+float ModeFBWT::energy_factor() const
 {
-    const float e_rate = get_energy_rate();
+    const float e_rate = energy_rate();
 
     if (!isfinite(e_rate)) {
         return 1.0f;
@@ -1802,7 +1882,7 @@ float ModeFBWT::compute_recovery_throttle() const
 
     const float energy_factor =
         constrain_float(
-            get_energy_factor(),
+            ModeFBWT::energy_factor(),
             0.0f,
             1.0f
         );
@@ -1830,14 +1910,8 @@ float ModeFBWT::compute_recovery_throttle() const
 
     const float aoa = get_fused_aoa();
 
-    if (isfinite(aoa) &&
-        aoa > _aoa_limit_deg) {
-
-        recovery =
-            MAX(
-                recovery,
-                cruise
-            );
+    if (isfinite(aoa) && aoa > _aoa_limit_deg) {
+        recovery = MAX(recovery, cruise);
     }
 
 
@@ -1850,9 +1924,8 @@ float ModeFBWT::compute_recovery_throttle() const
 
 float ModeFBWT::get_throttle_assist_gain() const
 {
-    if (_submode != FBWT_SUBMODE_LEVELUP) {
+    if (_submode != Submode::Levelup)
         return 0.0f;
-    }
 
     // ------------------------------------------------------------
     // Energy deficit
@@ -1860,7 +1933,7 @@ float ModeFBWT::get_throttle_assist_gain() const
 
     const float energy_factor =
         constrain_float(
-            get_energy_factor(),
+            ModeFBWT::energy_factor(),
             0.0f,
             1.0f
         );
@@ -1876,10 +1949,9 @@ float ModeFBWT::get_throttle_assist_gain() const
     float aoa_gain = 0.0f;
 
     const float aoa = get_fused_aoa();
+    constexpr float _aoa_soft_zone_deg = 3.f;
 
-    if (isfinite(aoa) &&
-        _aoa_limit_deg > _aoa_soft_zone_deg) {
-
+    if (isfinite(aoa) && _aoa_limit_deg > _aoa_soft_zone_deg) {
         aoa_gain =
             constrain_float(
                 (aoa - _aoa_soft_zone_deg) /
@@ -1922,7 +1994,7 @@ float ModeFBWT::get_throttle_assist_gain() const
     return demand;
 }
 
-void ModeFBWT::output_fbwt_throttle_assist() const
+void ModeFBWT::output_fbwt_throttle_assist()
 {
     /*
      * FBWT LEVELUP throttle assistance.

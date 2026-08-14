@@ -44,6 +44,7 @@ void Plane::rc_failsafe_short_on_event()
     case Mode::Number::ACRO:
     case Mode::Number::FLY_BY_WIRE_A:
     case Mode::Number::FLY_BY_WIRE_T:
+    case Mode::Number::FLY_BY_WIRE_L:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
     case Mode::Number::FLY_BY_WIRE_C:
@@ -160,6 +161,7 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, ModeReason reason
     case Mode::Number::ACRO:
     case Mode::Number::FLY_BY_WIRE_A:
     case Mode::Number::FLY_BY_WIRE_T:
+    case Mode::Number::FLY_BY_WIRE_L:
     case Mode::Number::AUTOTUNE:
     case Mode::Number::FLY_BY_WIRE_B:
     case Mode::Number::FLY_BY_WIRE_C:  // Allow failsafe also for FBWC to switch into RTL, Loiter, Landing when applicable

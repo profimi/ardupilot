@@ -1311,6 +1311,7 @@ bool Plane::nav_scripting_enable(uint8_t mode)
        case Mode::Number::FLY_BY_WIRE_B:
        case Mode::Number::FLY_BY_WIRE_C:
        case Mode::Number::FLY_BY_WIRE_T:
+       case Mode::Number::FLY_BY_WIRE_L:
        case Mode::Number::CRUISE:
        case Mode::Number::LOITER:
            nav_scripting.enabled = true;

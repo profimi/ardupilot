@@ -767,16 +767,16 @@ public:
     // Levelup and Headhold are auto-throttle (TECS-driven); Fbwa is manual throttle
     bool does_auto_throttle() const override { return _submode != Submode::Fbwa; }
 
-    // Headhold only actively steers via the navigation controller when it
-    // actually has a usable position to feed it (see have_position()); if
-    // GPS/position is unavailable this evaluates to false and update()
-    // instead runs a direct compass-only heading-hold fallback.
-     bool does_auto_navigation() const override { return _submode == Submode::Headhold && have_position(); }
+    // // Headhold only actively steers via the navigation controller when it
+    // // actually has a usable position to feed it (see have_position()); if
+    // // GPS/position is unavailable this evaluates to false and update()
+    // // instead runs a direct compass-only heading-hold fallback.
+    // bool does_auto_navigation() const override { return _submode == Submode::Headhold && have_position(); }
+    //
+    // // Don't let stick-mixing fight the bailout/hold controller
+    // bool allows_throttle_nudging() const override { return _submode == Submode::Headhold; }
 
-     // Don't let stick-mixing fight the bailout/hold controller
-     bool allows_throttle_nudging() const override { return _submode == Submode::Headhold; }
-
-     Submode get_submode() const { return _submode; }
+    Submode get_submode() const { return _submode; }
 
     // Update_target_altitude() is deliberately a no-op, like FBWB/CRUISE:
     // the Headhold target altitude is latched once (in run_levelup()) and
@@ -790,15 +790,15 @@ protected:
     // headhold(bool &isDirLocked, bool doPitchLock);  // Execute headhold
 
     bool _enter() override;
-    bool _exit() override;
+    void _exit() override;
 private:
-    struct EnvelopeLimits {
-        float aoa_max;
-        float n_max;
-        float energy_min;
-        float energy_max;
-        float limiter_floor;
-    };
+    // struct EnvelopeLimits {
+    //     float aoa_max;
+    //     float n_max;
+    //     float energy_min;
+    //     float energy_max;
+    //     float limiter_floor;
+    // };
 
     Submode _submode = Submode::Fbwa;
     AP_TECS* _tecs = nullptr;
@@ -835,7 +835,8 @@ private:
     void apply_aoa_rate_damping(float &pitch_cmd);
     void apply_aoa_limiter(float &pitch_cmd);
 
-    float get_energy_factor() const;
+    float energy_rate() const;
+    float energy_factor() const;
     float compute_recovery_throttle() const;
 
     void apply_envelope_limits(float &pitch, float &roll);
@@ -909,7 +910,7 @@ private:
     // EnvelopeLimits get_phase_limits(FBWTPhase phase) const;
     // float compute_envelope_limiter() const;
     // float get_load_factor() const;
-    // float get_energy_rate() const;
+    // float energy_rate() const;
     // float compute_energy_limiter() const;
     // float compute_energy_factor() const;
     // float compute_energy() const;
@@ -959,6 +960,10 @@ private:
 //     // AP_Int8 airspd_min;  // 1.2f * stall ~= 16 m/s
 //     // AP_Float ground_pitch;
 // };
+
+#ifndef MODE_FBWL_ENABLED
+#define MODE_FBWL_ENABLED 1
+#endif
 
 //!   ModeFBWL - "Fly By Wire Learning / Assisted".
 //!

@@ -35,7 +35,8 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
 
     case Mode::Number::STABILIZE:
     case Mode::Number::FLY_BY_WIRE_A:
-    case Mode::Number::FLY_BY_WIRE_T:  // TODO: consider activating rate_controlled, attitude_stabilized on limits violation
+    case Mode::Number::FLY_BY_WIRE_T:
+    case Mode::Number::FLY_BY_WIRE_L:
     case Mode::Number::AUTOTUNE:
 #if HAL_QUADPLANE_ENABLED
     case Mode::Number::QSTABILIZE:
@@ -49,6 +50,7 @@ void GCS_Plane::update_vehicle_sensor_status_flags(void)
     case Mode::Number::FLY_BY_WIRE_B:
     case Mode::Number::FLY_BY_WIRE_C:
     // case Mode::Number::FLY_BY_WIRE_T:
+    // case Mode::Number::FLY_BY_WIRE_L:
     case Mode::Number::CRUISE:
         rate_controlled = true;
         attitude_stabilized = true;
