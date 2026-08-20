@@ -27,14 +27,14 @@ const struct AP_Param::GroupInfo ModeFBWT::var_info[] = {
     // // @DisplayName: FBWT Minimal airspeed
     // // @Description: Minimum airspeed for the regular Submode::Fbwa, otherwise Submode::Headhold is activated 
     // // @Units: deg
-    // // @Range: -90 .. 90
+    // // @Range: -90 90
     // // @Increment: 1
     // AP_GROUPINFO("PITCH_MIN", 2, ModeFBWT, pitch_min, FBWT_PITCH_MIN),
 
     // @Param: CTL_EXPOCRV
     // @DisplayName: RC controls exponential smoothing
     // @Description: Use exponential curve smoothing of the RC input controls; 0 means desabled
-    // @Range: 0 .. 0.5
+    // @Range: 0 0.5
     AP_GROUPINFO("CTL_EXPOCRV", 2, ModeFBWT, ctl_expocrv, CTL_EXPOCRV),
 
     // Note: AIRSPD_MIN is defined automatically as aparm.airspeed_min + (aparm.airspeed_cruise - aparm.airspeed_min) / 10.f
