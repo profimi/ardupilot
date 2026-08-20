@@ -604,11 +604,13 @@ int32_t ModeFBWL::reference_alt_cm() const
 // relative altitude in metres for logging; 0 if no estimate available
 float ModeFBWL::alt_too_low_margin_m() const
 {
-    Location loc;
-    if (!ahrs.get_location(loc)) {
-        return 0.0f;
+    {
+        Location loc;
+        if (ahrs.get_location(loc))
+            return (loc.alt - reference_alt_cm()) * 0.01f;
     }
-    return (loc.alt - reference_alt_cm()) * 0.01f;
+
+    return plane.relative_altitude;  // meters
 }
 
 bool ModeFBWL::speed_available(float &eas) const
@@ -701,12 +703,27 @@ bool ModeFBWL::pitch_too_low() const
 
 bool ModeFBWL::alt_too_low() const
 {
-    Location loc;
-    if (!ahrs.get_location(loc)) {
-        return false;
+    {
+        Location loc;
+        if (ahrs.get_location(loc)) {
+            const float rel_alt_m = (loc.alt - reference_alt_cm()) * 0.01f;
+            return rel_alt_m < alt_min_m;
+        }
     }
-    const float rel_alt_m = (loc.alt - reference_alt_cm()) * 0.01f;
-    return rel_alt_m < alt_min_m;
+
+    int16_t alt = roundf(plane.relative_altitude);  // meters
+    float vel_down;
+    float sink_rate = 0;
+    const AP_GPS &gps = AP::gps();
+    if (ahrs.get_velocity_D(vel_down))
+        sink_rate = vel_down;
+    else if (gps.status() >= AP_GPS::GPS_OK_FIX_3D && gps.have_vertical_velocity())
+        sink_rate = gps.velocity().z;
+    else sink_rate = -plane.barometer.get_climb_rate();
+    // // Smooth the noise
+    // auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f * sink_rate;    
+
+    return (sink_rate > 0.1f && alt < alt_min_m + sink_rate*3);
 }
 
 // Hard AoA breach: the soft limiter has failed to hold AoA within a

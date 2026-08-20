@@ -425,7 +425,7 @@ bool ModeFBWT::is_below_alt_min() const
     // // Smooth the noise
     // auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f * sink_rate;    
 
-    return (sink_rate > 0 && alt < alt_min + sink_rate*3);
+    return (sink_rate > 0.1f && alt < alt_min + sink_rate*3);
 }
 
 // Levelup controller
